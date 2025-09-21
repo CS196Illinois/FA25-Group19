@@ -1,8 +1,8 @@
-# Group TEAM_NUMBER
-Group Name: TEAM_NAME
+# Group 19
+Group Name: Instant Outfitters
 
-[MVP Link](https://docs.google.com/document/d/1xFI9DDdO5HZAcu36Y6NL-RTDry5E3WHkfy-ZEWuqbXM/edit?usp=sharing)
+[MVP Link](https://docs.google.com/document/d/1Ce0E95NChEEbbXlKLPFTZ7U9_OF9CWHH/edit)
 
-Team Members: STUDENTS_NETIDS
+Team Members: dpattie2, averyyl2, jooc2, zoyalou2
 
-Project Manager: PM_NETID
+Project Manager: sahanah2
