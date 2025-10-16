@@ -1,0 +1,9 @@
+1. cd ~/clip_workingtrial
+2. source venv/bin/activate
+    - activate virtual environment
+3. uvicorn app.main:app --reload
+    - run uvicorn server
+4. open index.html in VS Code
+    - right click anywhere in editor
+    - click stop live server
+    - click open with live server
