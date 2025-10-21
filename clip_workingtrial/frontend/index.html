@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CLIP Image Similarity</title>
+</head>
+<body>
+    <h1>Upload an image to embed</h1>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" name="file" accept="image/*" required>
+        <button type="submit">Upload and Embed</button>
+    </form>
+
+    <h1>Upload an image to compare</h1>
+    <form id="compareForm" enctype="multipart/form-data">
+        <input type="file" name="file" accept="image/*" required>
+        <button type="submit">Compare Images</button>
+    </form>
+
+    <pre id="output"></pre>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const formData = new FormData(form);
+
+            const response = await fetch('http://127.0.0.1:8000/upload-image/', {
+                method: 'POST',
+                body: formData
+            });
+
+            const responseText = await response.text();
+            console.log("Raw response text:", responseText); // Check this in the browser console
+
+            try {
+                const result = JSON.parse(responseText);
+                document.getElementById('output').textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                console.error("JSON parse failed. Check raw response:", error);
+            }
+        });
+
+        document.getElementById('compareForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const formData = new FormData(form);
+
+            const response = await fetch('http://127.0.0.1:8000/compare-images/', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+            document.getElementById('output').textContent = JSON.stringify(result, null, 2);
+        });
+    </script>
+</body>
+</html>
