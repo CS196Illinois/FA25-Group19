@@ -157,6 +157,17 @@
         <button id="refreshBottoms">Refresh Bottoms</button>
         <div id="bottomsGallery" class="gallery-container"></div>
     </div>
+    
+    <!-- Generate Outfits Section -->
+    <div class="gallery-section">
+        <h2>Generate Outfits</h2>
+        <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 15px;">
+            <button id="generateRandomBtn">Generate Random Outfit</button>
+            <button id="generatePickedBtn">Generate Based on Picked Clothing</button>
+            <button id="generateSimilarityBtn">Generate for Me (Similarity)</button>
+            <button id="generateDatasetBtn">Generate for Me (Dataset)</button>
+        </div>
+    </div>
 
     <script>
         let topsFiles = [];
@@ -318,6 +329,27 @@
         window.addEventListener('load', () => {
             loadGallery('top');
             loadGallery('bottom');
+        });
+        
+        // Outfit generation buttons (placeholder functionality)
+        document.getElementById('generateRandomBtn').addEventListener('click', () => {
+            console.log('Generate Random Outfit clicked');
+            // TODO: Add random outfit generation functionality
+        });
+        
+        document.getElementById('generatePickedBtn').addEventListener('click', () => {
+            console.log('Generate Based on Picked Clothing clicked');
+            // TODO: Add picked clothing outfit generation functionality
+        });
+        
+        document.getElementById('generateSimilarityBtn').addEventListener('click', () => {
+            console.log('Generate for Me (Similarity) clicked');
+            // TODO: Add similarity-based outfit generation functionality
+        });
+        
+        document.getElementById('generateDatasetBtn').addEventListener('click', () => {
+            console.log('Generate for Me (Dataset) clicked');
+            // TODO: Add dataset-based outfit generation functionality
         });
     </script>
 </body>
