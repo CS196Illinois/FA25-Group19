@@ -1,76 +1,323 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>CLIP Image Similarity</title>
+    <title>CLIP Image Similarity - Tops & Bottoms</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .upload-section {
+            border: 2px solid #ddd;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+        }
+        
+        .preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .preview-item {
+            position: relative;
+            width: 150px;
+        }
+        
+        .preview-item img {
+            width: 150px;
+            height: 150px;
+            object-fit: cover;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .preview-item button {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: red;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .gallery-section {
+            margin-top: 40px;
+        }
+        
+        .gallery-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .gallery-item {
+            position: relative;
+            width: 200px;
+        }
+        
+        .gallery-item img {
+            width: 200px;
+            height: 200px;
+            object-fit: cover;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .gallery-item .delete-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: red;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .gallery-item .filename {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            word-wrap: break-word;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        .delete-btn:hover {
+            background: darkred !important;
+        }
+        
+        input[type="file"] {
+            margin: 10px 0;
+        }
+        
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Upload an image to embed</h1>
-    <form id="uploadForm" enctype="multipart/form-data">
-        <input type="file" name="file" accept="image/*" required>
-        <button type="submit">Upload and Embed</button>
-    </form>
-
-    <h1>Upload an image to compare</h1>
-    <form id="compareForm" enctype="multipart/form-data">
-        <input type="file" name="file" accept="image/*" required>
-        <button type="submit">Compare Images</button>
-    </form>
-
+    <h1>Upload Clothing Images</h1>
+    
+    <!-- Tops Upload Section -->
+    <div class="upload-section">
+        <h2>Upload Tops</h2>
+        <input type="file" id="topsInput" accept="image/*" multiple>
+        <div id="topsPreview" class="preview-container"></div>
+        <button id="uploadTopsBtn" style="display: none;">Upload Tops</button>
+    </div>
+    
+    <!-- Bottoms Upload Section -->
+    <div class="upload-section">
+        <h2>Upload Bottoms</h2>
+        <input type="file" id="bottomsInput" accept="image/*" multiple>
+        <div id="bottomsPreview" class="preview-container"></div>
+        <button id="uploadBottomsBtn" style="display: none;">Upload Bottoms</button>
+    </div>
+    
     <pre id="output"></pre>
+    
+    <!-- Gallery Section -->
+    <div class="gallery-section">
+        <h2>Currently Uploaded Tops</h2>
+        <button id="refreshTops">Refresh Tops</button>
+        <div id="topsGallery" class="gallery-container"></div>
+    </div>
+    
+    <div class="gallery-section">
+        <h2>Currently Uploaded Bottoms</h2>
+        <button id="refreshBottoms">Refresh Bottoms</button>
+        <div id="bottomsGallery" class="gallery-container"></div>
+    </div>
 
     <script>
-        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const form = e.target;
-            const formData = new FormData(form);
-
-            const response = await fetch('http://127.0.0.1:8000/upload-image/', {
-                method: 'POST',
-                body: formData
+        let topsFiles = [];
+        let bottomsFiles = [];
+        
+        // Handle tops file selection
+        document.getElementById('topsInput').addEventListener('change', (e) => {
+            topsFiles = Array.from(e.target.files);
+            displayPreviews(topsFiles, 'topsPreview');
+            document.getElementById('uploadTopsBtn').style.display = topsFiles.length > 0 ? 'block' : 'none';
+        });
+        
+        // Handle bottoms file selection
+        document.getElementById('bottomsInput').addEventListener('change', (e) => {
+            bottomsFiles = Array.from(e.target.files);
+            displayPreviews(bottomsFiles, 'bottomsPreview');
+            document.getElementById('uploadBottomsBtn').style.display = bottomsFiles.length > 0 ? 'block' : 'none';
+        });
+        
+        // Display image previews
+        function displayPreviews(files, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            files.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const previewItem = document.createElement('div');
+                    previewItem.className = 'preview-item';
+                    
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    
+                    const removeBtn = document.createElement('button');
+                    removeBtn.textContent = 'X';
+                    removeBtn.onclick = () => removePreview(index, containerId);
+                    
+                    previewItem.appendChild(img);
+                    previewItem.appendChild(removeBtn);
+                    container.appendChild(previewItem);
+                };
+                reader.readAsDataURL(file);
             });
-
-            const responseText = await response.text();
-            console.log("Raw response text:", responseText); // Check this in the browser console
-
-            try {
-                const result = JSON.parse(responseText);
-                document.getElementById('output').textContent = JSON.stringify(result, null, 2);
-            } catch (error) {
-                console.error("JSON parse failed. Check raw response:", error);
+        }
+        
+        // Remove image from preview
+        function removePreview(index, containerId) {
+            if (containerId === 'topsPreview') {
+                topsFiles.splice(index, 1);
+                displayPreviews(topsFiles, 'topsPreview');
+                document.getElementById('uploadTopsBtn').style.display = topsFiles.length > 0 ? 'block' : 'none';
+            } else {
+                bottomsFiles.splice(index, 1);
+                displayPreviews(bottomsFiles, 'bottomsPreview');
+                document.getElementById('uploadBottomsBtn').style.display = bottomsFiles.length > 0 ? 'block' : 'none';
             }
+        }
+        
+        // Upload tops
+        document.getElementById('uploadTopsBtn').addEventListener('click', async () => {
+            await uploadImages(topsFiles, 'top');
+            topsFiles = [];
+            document.getElementById('topsPreview').innerHTML = '';
+            document.getElementById('topsInput').value = '';
+            document.getElementById('uploadTopsBtn').style.display = 'none';
+            loadGallery('top');
         });
-
-        document.getElementById('compareForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const form = e.target;
-            const formData = new FormData(form);
-
-            const response = await fetch('http://127.0.0.1:8000/compare-images/', {
-                method: 'POST',
-                body: formData
-            });
-            const result = await response.json();
-            document.getElementById('output').textContent = JSON.stringify(result, null, 2);
+        
+        // Upload bottoms
+        document.getElementById('uploadBottomsBtn').addEventListener('click', async () => {
+            await uploadImages(bottomsFiles, 'bottom');
+            bottomsFiles = [];
+            document.getElementById('bottomsPreview').innerHTML = '';
+            document.getElementById('bottomsInput').value = '';
+            document.getElementById('uploadBottomsBtn').style.display = 'none';
+            loadGallery('bottom');
         });
-    </script>
-
-    <h1>Currently Uploaded Images</h1>
-    <button id="fetchImages">Refresh Image List</button>
-    <ul id="imageList"></ul>
-
-    <script>
-        // ...existing script...
-
-        document.getElementById('fetchImages').addEventListener('click', async () => {
-            const response = await fetch('http://127.0.0.1:8000/get-images/');
-            const data = await response.json();
-            const list = document.getElementById('imageList');
-            list.innerHTML = '';
-            data.forEach(img => {
-                const li = document.createElement('li');
-                li.textContent = `${img.filename} (Uploaded at: ${img.uploaded_at})`;
-                list.appendChild(li);
-            });
+        
+        // Upload images function
+        async function uploadImages(files, category) {
+            const results = [];
+            for (const file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('category', category);
+                
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/upload-image/', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const result = await response.json();
+                    results.push(result);
+                } catch (error) {
+                    console.error('Upload error:', error);
+                }
+            }
+            document.getElementById('output').textContent = JSON.stringify(results, null, 2);
+        }
+        
+        // Load gallery
+        async function loadGallery(category) {
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/get-images/${category}`);
+                const images = await response.json();
+                const containerId = category === 'top' ? 'topsGallery' : 'bottomsGallery';
+                const container = document.getElementById(containerId);
+                container.innerHTML = '';
+                
+                for (const img of images) {
+                    const galleryItem = document.createElement('div');
+                    galleryItem.className = 'gallery-item';
+                    
+                    const imgElement = document.createElement('img');
+                    imgElement.src = `http://127.0.0.1:8000/get-image/${category}/${img.id}`;
+                    
+                    const filename = document.createElement('div');
+                    filename.className = 'filename';
+                    filename.textContent = img.filename;
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'delete-btn';
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.onclick = () => deleteImage(img.id, category);
+                    
+                    galleryItem.appendChild(imgElement);
+                    galleryItem.appendChild(deleteBtn);
+                    galleryItem.appendChild(filename);
+                    container.appendChild(galleryItem);
+                }
+            } catch (error) {
+                console.error('Error loading gallery:', error);
+            }
+        }
+        
+        // Delete image
+        async function deleteImage(imageId, category) {
+            if (!confirm('Are you sure you want to delete this image?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/delete-image/${category}/${imageId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                document.getElementById('output').textContent = JSON.stringify(result, null, 2);
+                loadGallery(category);
+            } catch (error) {
+                console.error('Delete error:', error);
+            }
+        }
+        
+        // Refresh buttons
+        document.getElementById('refreshTops').addEventListener('click', () => loadGallery('top'));
+        document.getElementById('refreshBottoms').addEventListener('click', () => loadGallery('bottom'));
+        
+        // Load galleries on page load
+        window.addEventListener('load', () => {
+            loadGallery('top');
+            loadGallery('bottom');
         });
     </script>
 </body>

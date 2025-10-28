@@ -1,5 +1,6 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from PIL import Image
 import torch
 import clip
@@ -7,7 +8,10 @@ from io import BytesIO
 import torch.nn.functional as F
 import pickle
 
-from app.database import init_db, insert_image, get_all_embeddings, insert_similarity, get_all_images
+from app.database import (
+    init_db, insert_image, get_all_embeddings, insert_similarity, 
+    get_all_images, get_image_by_id, delete_image
+)
 
 app = FastAPI()
 
@@ -42,8 +46,12 @@ def get_image_embedding(image_data):
     return image_features.cpu()
 
 @app.post("/upload-image/")
-async def upload_image(file: UploadFile = File(...)):
+async def upload_image(file: UploadFile = File(...), category: str = Form(...)):
     try:
+        # Validate category
+        if category not in ['top', 'bottom']:
+            raise HTTPException(status_code=400, detail="Category must be 'top' or 'bottom'")
+        
         image_data = await file.read()
         embedding = get_image_embedding(image_data)
 
@@ -51,30 +59,46 @@ async def upload_image(file: UploadFile = File(...)):
         embedding_bytes = pickle.dumps(embedding.tolist())
         filename = file.filename
 
-        # Insert image into DB
-        insert_image(filename, image_data, embedding_bytes)
+        # Insert image into DB with category
+        image_id = insert_image(filename, image_data, embedding_bytes, category)
 
-        # Compute similarity with all existing images
-        all_rows = get_all_embeddings()
+        # Compute similarity with all existing images in the same category
+        all_rows = get_all_embeddings(category)
         for img_id, img_name, img_embedding_bytes in all_rows:
-            if img_name == filename:
+            if img_id == image_id:  # Skip comparing with itself
                 continue
             existing_embedding = torch.tensor(pickle.loads(img_embedding_bytes))
             similarity = F.cosine_similarity(embedding, existing_embedding).item()
-            insert_similarity(img_id, None, similarity)  # store comparison record
+            
+            # Store similarity based on category
+            if category == 'top':
+                insert_similarity(image_id, img_id, similarity)
+            else:
+                insert_similarity(img_id, image_id, similarity)
 
-        return {"filename": filename, "message": "Image uploaded and stored successfully."}
+        return {
+            "filename": filename, 
+            "message": f"Image uploaded successfully to {category}s",
+            "id": image_id,
+            "category": category
+        }
 
+    except HTTPException as he:
+        raise he
     except Exception as e:
         return {"error": f"An error occurred during upload: {e}"}
 
 # Route to calculate and return similarity score
 @app.post("/compare-images/")
-async def compare_images(file: UploadFile = File(...)):
+async def compare_images(file: UploadFile = File(...), category: str = Form(...)):
     try:
-        rows = get_all_embeddings()
+        # Validate category
+        if category not in ['top', 'bottom']:
+            raise HTTPException(status_code=400, detail="Category must be 'top' or 'bottom'")
+        
+        rows = get_all_embeddings(category)
         if not rows:
-            return {"error": "No images in database to compare against."}
+            return {"error": f"No {category} images in database to compare against."}
 
         image_data = await file.read()
         new_embedding = get_image_embedding(image_data)
@@ -89,14 +113,63 @@ async def compare_images(file: UploadFile = File(...)):
                 highest_score = similarity
                 best_match = img_name
 
-        return {"best_match": best_match, "similarity_score": highest_score}
+        return {"best_match": best_match, "similarity_score": highest_score, "category": category}
 
+    except HTTPException as he:
+        raise he
     except Exception as e:
         return {"error": f"An error occurred during comparison: {e}"}
-    
-@app.get("/get-images/")
-def get_images():
+
+@app.get("/get-images/{category}")
+def get_images(category: str):
     try:
-        return get_all_images()
+        # Validate category
+        if category not in ['top', 'bottom']:
+            raise HTTPException(status_code=400, detail="Category must be 'top' or 'bottom'")
+        
+        return get_all_images(category)
+    except HTTPException as he:
+        raise he
     except Exception as e:
         return {"error": f"Failed to fetch images: {e}"}
+
+@app.get("/get-image/{category}/{image_id}")
+async def get_image(category: str, image_id: int):
+    """
+    Get image data by id and return as binary image
+    """
+    try:
+        # Validate category
+        if category not in ['top', 'bottom']:
+            raise HTTPException(status_code=400, detail="Category must be 'top' or 'bottom'")
+        
+        image_data = get_image_by_id(image_id, category)
+        if image_data is None:
+            raise HTTPException(status_code=404, detail="Image not found")
+        
+        # image_data is a tuple: (id, filename, image_data, embedding)
+        # Return the image binary data (index 2)
+        return Response(content=image_data[2], media_type="image/jpeg")
+    
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/delete-image/{category}/{image_id}")
+async def delete_image_endpoint(category: str, image_id: int):
+    """
+    Delete an image by id from the specified category
+    """
+    try:
+        # Validate category
+        if category not in ['top', 'bottom']:
+            raise HTTPException(status_code=400, detail="Category must be 'top' or 'bottom'")
+        
+        delete_image(image_id, category)
+        return {"message": f"Image {image_id} deleted successfully from {category}s"}
+    
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
