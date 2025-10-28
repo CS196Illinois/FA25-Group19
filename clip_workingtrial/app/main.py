@@ -4,6 +4,10 @@ from PIL import Image
 import torch
 import clip
 from io import BytesIO
+import torch.nn.functional as F
+import pickle
+
+from app.database import init_db, insert_image, get_all_embeddings, insert_similarity, get_all_images
 
 app = FastAPI()
 
@@ -11,9 +15,8 @@ app = FastAPI()
 origins = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "http://localhost:5500", # Example port for live server extension
+    "http://localhost:5500",
     "http://127.0.0.1:5500",
-    # You can also add other origins if needed
 ]
 
 app.add_middleware(
@@ -24,76 +27,76 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory storage for uploaded images and their embeddings
-db = {}
+# Initialize database
+init_db()
 
 # Load the CLIP model
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load("ViT-B/32", device=device)
 
-# Function to generate embedding for a single image
 def get_image_embedding(image_data):
     image = preprocess(Image.open(BytesIO(image_data))).unsqueeze(0).to(device)
     with torch.no_grad():
         image_features = model.encode_image(image)
-    return image_features.flatten().tolist()
+        image_features /= image_features.norm(dim=-1, keepdim=True)
+    return image_features.cpu()
 
-# Route to handle image upload
 @app.post("/upload-image/")
 async def upload_image(file: UploadFile = File(...)):
-    print("1. Upload route triggered.")
     try:
         image_data = await file.read()
-        print(f"2. Read {len(image_data)} bytes from the uploaded file.")
-
-        # In a real app, save the image to a file or cloud storage
-        image_id = file.filename
-
-        # Generate the embedding
         embedding = get_image_embedding(image_data)
 
-        # Store in our "database"
-        db[image_id] = {
-            "embedding": embedding,
-            # In a real app, you would also store the image URL/path
-            "image_data": image_data
-        }
+        # Convert embedding to bytes (to store in SQLite)
+        embedding_bytes = pickle.dumps(embedding.tolist())
+        filename = file.filename
 
-        return {"filename": image_id, "message": "Image uploaded and embedded successfully."}
+        # Insert image into DB
+        insert_image(filename, image_data, embedding_bytes)
+
+        # Compute similarity with all existing images
+        all_rows = get_all_embeddings()
+        for img_id, img_name, img_embedding_bytes in all_rows:
+            if img_name == filename:
+                continue
+            existing_embedding = torch.tensor(pickle.loads(img_embedding_bytes))
+            similarity = F.cosine_similarity(embedding, existing_embedding).item()
+            insert_similarity(img_id, None, similarity)  # store comparison record
+
+        return {"filename": filename, "message": "Image uploaded and stored successfully."}
 
     except Exception as e:
-         # Catch any exceptions and return a clear error message
         return {"error": f"An error occurred during upload: {e}"}
 
 # Route to calculate and return similarity score
 @app.post("/compare-images/")
 async def compare_images(file: UploadFile = File(...)):
     try:
-        if not db:
+        rows = get_all_embeddings()
+        if not rows:
             return {"error": "No images in database to compare against."}
 
-        # Get the new image's embedding
         image_data = await file.read()
-        new_embedding = torch.tensor(get_image_embedding(image_data))
+        new_embedding = get_image_embedding(image_data)
 
         best_match = None
         highest_score = -1
 
-        # Compare with all existing images in the database
-        for image_id, data in db.items():
-            db_embedding = torch.tensor(data["embedding"])
+        for img_id, img_name, img_embedding_bytes in rows:
+            existing_embedding = torch.tensor(pickle.loads(img_embedding_bytes))
+            similarity = F.cosine_similarity(new_embedding, existing_embedding).item()
+            if similarity > highest_score:
+                highest_score = similarity
+                best_match = img_name
 
-            # Calculate cosine similarity
-            similarity_score = torch.nn.functional.cosine_similarity(new_embedding.unsqueeze(0), db_embedding.unsqueeze(0))
+        return {"best_match": best_match, "similarity_score": highest_score}
 
-            if similarity_score > highest_score:
-                highest_score = similarity_score.item()
-                best_match = image_id
-
-        return {
-            "best_match": best_match,
-            "similarity_score": highest_score
-        }
     except Exception as e:
-        # Catch any exceptions and return a clear error message
         return {"error": f"An error occurred during comparison: {e}"}
+    
+@app.get("/get-images/")
+def get_images():
+    try:
+        return get_all_images()
+    except Exception as e:
+        return {"error": f"Failed to fetch images: {e}"}

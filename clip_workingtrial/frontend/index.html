@@ -53,5 +53,25 @@
             document.getElementById('output').textContent = JSON.stringify(result, null, 2);
         });
     </script>
+
+    <h1>Currently Uploaded Images</h1>
+    <button id="fetchImages">Refresh Image List</button>
+    <ul id="imageList"></ul>
+
+    <script>
+        // ...existing script...
+
+        document.getElementById('fetchImages').addEventListener('click', async () => {
+            const response = await fetch('http://127.0.0.1:8000/get-images/');
+            const data = await response.json();
+            const list = document.getElementById('imageList');
+            list.innerHTML = '';
+            data.forEach(img => {
+                const li = document.createElement('li');
+                li.textContent = `${img.filename} (Uploaded at: ${img.uploaded_at})`;
+                list.appendChild(li);
+            });
+        });
+    </script>
 </body>
 </html>
