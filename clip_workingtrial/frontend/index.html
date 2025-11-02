@@ -122,6 +122,71 @@
             border-bottom: 2px solid #007bff;
             padding-bottom: 10px;
         }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 700px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .close-modal {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close-modal:hover {
+            color: #000;
+        }
+
+        .outfit-display {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .outfit-item {
+            text-align: center;
+        }
+
+        .outfit-item h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .outfit-item img {
+            width: 250px;
+            height: 250px;
+            object-fit: cover;
+            border: 3px solid #007bff;
+            border-radius: 8px;
+        }
+
+        .outfit-item p {
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -166,6 +231,26 @@
             <button id="generatePickedBtn">Generate Based on Picked Clothing</button>
             <button id="generateSimilarityBtn">Generate for Me (Similarity)</button>
             <button id="generateDatasetBtn">Generate for Me (Dataset)</button>
+        </div>
+    </div>
+
+    <!-- Modal for displaying generated outfit -->
+    <div id="outfitModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" id="closeModal">&times;</span>
+            <h2 style="text-align: center; margin-bottom: 20px;">Your Generated Outfit</h2>
+            <div class="outfit-display">
+                <div class="outfit-item">
+                    <h4>Top</h4>
+                    <img id="outfitTopImg" alt="Top clothing item">
+                    <p id="outfitTopName"></p>
+                </div>
+                <div class="outfit-item">
+                    <h4>Bottom</h4>
+                    <img id="outfitBottomImg" alt="Bottom clothing item">
+                    <p id="outfitBottomName"></p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -331,10 +416,49 @@
             loadGallery('bottom');
         });
         
-        // Outfit generation buttons (placeholder functionality)
-        document.getElementById('generateRandomBtn').addEventListener('click', () => {
-            console.log('Generate Random Outfit clicked');
-            // TODO: Add random outfit generation functionality
+        // Modal functionality
+        const modal = document.getElementById('outfitModal');
+        const closeModal = document.getElementById('closeModal');
+
+        // Close modal when X is clicked
+        closeModal.onclick = function() {
+            modal.style.display = 'none';
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Generate Random Outfit
+        document.getElementById('generateRandomBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/generate-random-outfit/');
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    alert(error.detail || 'Failed to generate outfit');
+                    return;
+                }
+
+                const outfit = await response.json();
+
+                // Set the images and filenames
+                document.getElementById('outfitTopImg').src = `http://127.0.0.1:8000/get-image/top/${outfit.top.id}`;
+                document.getElementById('outfitTopName').textContent = outfit.top.filename;
+
+                document.getElementById('outfitBottomImg').src = `http://127.0.0.1:8000/get-image/bottom/${outfit.bottom.id}`;
+                document.getElementById('outfitBottomName').textContent = outfit.bottom.filename;
+
+                // Show the modal
+                modal.style.display = 'block';
+
+            } catch (error) {
+                console.error('Error generating random outfit:', error);
+                alert('An error occurred while generating the outfit. Please try again.');
+            }
         });
         
         document.getElementById('generatePickedBtn').addEventListener('click', () => {
@@ -342,9 +466,33 @@
             // TODO: Add picked clothing outfit generation functionality
         });
         
-        document.getElementById('generateSimilarityBtn').addEventListener('click', () => {
-            console.log('Generate for Me (Similarity) clicked');
-            // TODO: Add similarity-based outfit generation functionality
+        // Generate Similarity-Based Outfit
+        document.getElementById('generateSimilarityBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/generate-similarity-outfit/');
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    alert(error.detail || 'Failed to generate outfit');
+                    return;
+                }
+
+                const outfit = await response.json();
+
+                // Set the images and filenames
+                document.getElementById('outfitTopImg').src = `http://127.0.0.1:8000/get-image/top/${outfit.top.id}`;
+                document.getElementById('outfitTopName').textContent = outfit.top.filename;
+
+                document.getElementById('outfitBottomImg').src = `http://127.0.0.1:8000/get-image/bottom/${outfit.bottom.id}`;
+                document.getElementById('outfitBottomName').textContent = `${outfit.bottom.filename} (Similarity: ${(outfit.similarity_score * 100).toFixed(1)}%)`;
+
+                // Show the modal
+                modal.style.display = 'block';
+
+            } catch (error) {
+                console.error('Error generating similarity-based outfit:', error);
+                alert('An error occurred while generating the outfit. Please try again.');
+            }
         });
         
         document.getElementById('generateDatasetBtn').addEventListener('click', () => {
