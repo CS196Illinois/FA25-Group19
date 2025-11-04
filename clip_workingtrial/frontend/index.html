@@ -90,18 +90,50 @@
         <div class="wardrobe-modal-content">
             <span class="close-modal" id="closeWardrobe">&times;</span>
             <h2 style="text-align: center; margin-bottom: 20px;">Wardrobe</h2>
-            
+
             <div class="wardrobe-section">
                 <h3>Tops</h3>
                 <div id="wardrobeTopsGrid" class="wardrobe-grid"></div>
             </div>
-            
+
             <div class="wardrobe-section">
                 <h3>Bottoms</h3>
                 <div id="wardrobeBottomsGrid" class="wardrobe-grid"></div>
             </div>
-            
+
             <button id="wardrobeConfirmBtn" class="wardrobe-confirm-btn" disabled>Confirm</button>
+        </div>
+    </div>
+
+    <!-- Duplicate detection modal -->
+    <div id="duplicateModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <span class="close-modal" id="closeDuplicate">&times;</span>
+            <h2 style="text-align: center; margin-bottom: 20px;">Duplicate Detected</h2>
+
+            <p id="duplicateMessage" style="text-align: center; margin-bottom: 20px; font-size: 1.1em;"></p>
+
+            <div class="outfit-display" style="margin-bottom: 20px;">
+                <div class="outfit-item">
+                    <h4>Your Image</h4>
+                    <img id="duplicateNewImg" alt="New image" style="max-height: 300px;">
+                </div>
+                <div class="outfit-item">
+                    <h4>Existing Image</h4>
+                    <img id="duplicateExistingImg" alt="Existing image" style="max-height: 300px;">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                <button id="duplicateOverwriteBtn" style="background-color: #ff6b6b; padding: 10px 20px; border: none; border-radius: 5px; color: white; cursor: pointer;">Overwrite</button>
+                <button id="duplicateRenameBtn" style="background-color: #4CAF50; padding: 10px 20px; border: none; border-radius: 5px; color: white; cursor: pointer;">Rename</button>
+                <button id="duplicateCancelBtn" style="background-color: #999; padding: 10px 20px; border: none; border-radius: 5px; color: white; cursor: pointer;">Cancel</button>
+            </div>
+
+            <div id="renameInputContainer" style="display: none; margin-top: 20px; text-align: center;">
+                <input type="text" id="duplicateNewFilename" placeholder="Enter new filename" style="padding: 10px; width: 300px; margin-right: 10px;">
+                <button id="duplicateConfirmRenameBtn" style="background-color: #4CAF50; padding: 10px 20px; border: none; border-radius: 5px; color: white; cursor: pointer;">Confirm Rename</button>
+            </div>
         </div>
     </div>
 
@@ -275,12 +307,23 @@
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('category', category);
-                
+
                 try {
                     const response = await fetch('http://127.0.0.1:8000/upload-image/', {
                         method: 'POST',
                         body: formData
                     });
+
+                    // Handle 409 Conflict (duplicate detected)
+                    if (response.status === 409) {
+                        const errorData = await response.json();
+                        const duplicateData = errorData.detail;
+
+                        // Show duplicate modal with images and options
+                        await handleDuplicate(file, duplicateData, category);
+                        continue;
+                    }
+
                     const result = await response.json();
                     results.push(result);
                 } catch (error) {
@@ -288,6 +331,126 @@
                 }
             }
             document.getElementById('output').textContent = JSON.stringify(results, null, 2);
+        }
+
+        // Handle duplicate detection dialog
+        async function handleDuplicate(newFile, duplicateData, category) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('duplicateModal');
+                const messageEl = document.getElementById('duplicateMessage');
+                const existingImgEl = document.getElementById('duplicateExistingImg');
+                const newImgEl = document.getElementById('duplicateNewImg');
+                const overwriteBtn = document.getElementById('duplicateOverwriteBtn');
+                const renameBtn = document.getElementById('duplicateRenameBtn');
+                const cancelBtn = document.getElementById('duplicateCancelBtn');
+                const renameInputContainer = document.getElementById('renameInputContainer');
+                const renameInput = document.getElementById('duplicateNewFilename');
+                const confirmRenameBtn = document.getElementById('duplicateConfirmRenameBtn');
+
+                // Display message
+                messageEl.textContent = duplicateData.message;
+
+                // Display new image
+                const newReader = new FileReader();
+                newReader.onload = (e) => {
+                    newImgEl.src = e.target.result;
+                };
+                newReader.readAsDataURL(newFile);
+
+                // Display existing image
+                existingImgEl.src = `http://127.0.0.1:8000/get-image/${category}/${duplicateData.existing_id}`;
+
+                // Reset rename input
+                renameInputContainer.style.display = 'none';
+                renameInput.value = '';
+
+                // Show modal
+                modal.style.display = 'block';
+
+                // Handle overwrite
+                overwriteBtn.onclick = async () => {
+                    modal.style.display = 'none';
+                    // Delete existing image first
+                    await fetch(`http://127.0.0.1:8000/delete-image/${category}/${duplicateData.existing_id}`, {
+                        method: 'DELETE'
+                    });
+                    // Then upload new image with same filename
+                    const formData = new FormData();
+                    formData.append('file', newFile);
+                    formData.append('category', category);
+                    const response = await fetch('http://127.0.0.1:8000/upload-image/', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const result = await response.json();
+                    console.log('Upload after overwrite:', result);
+                    loadGallery(category);
+                    resolve();
+                };
+
+                // Handle rename
+                renameBtn.onclick = () => {
+                    renameInputContainer.style.display = 'block';
+                    renameInput.focus();
+                    renameInput.value = newFile.name.replace(/\.[^.]+$/, ''); // Pre-fill with filename without extension
+                };
+
+                // Handle confirm rename
+                confirmRenameBtn.onclick = async () => {
+                    const newFilename = renameInput.value.trim();
+                    if (!newFilename) {
+                        alert('Please enter a filename');
+                        return;
+                    }
+
+                    // Get file extension from original file
+                    const extension = newFile.name.substring(newFile.name.lastIndexOf('.'));
+                    const fullNewFilename = newFilename + extension;
+
+                    // Create new file with renamed filename
+                    const renamedFile = new File([newFile], fullNewFilename, { type: newFile.type });
+
+                    // Upload with new filename
+                    const formData = new FormData();
+                    formData.append('file', renamedFile);
+                    formData.append('category', category);
+
+                    try {
+                        const response = await fetch('http://127.0.0.1:8000/upload-image/', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (response.status === 409) {
+                            // Still a duplicate after rename - show error
+                            const newErrorData = await response.json();
+                            alert('Renamed file is still a duplicate: ' + newErrorData.detail.message);
+                            return;
+                        }
+
+                        const result = await response.json();
+                        console.log('Upload after rename:', result);
+                        modal.style.display = 'none';
+                        loadGallery(category);
+                        resolve();
+                    } catch (error) {
+                        console.error('Rename upload error:', error);
+                        alert('Error uploading renamed file');
+                    }
+                };
+
+                // Handle cancel
+                cancelBtn.onclick = () => {
+                    modal.style.display = 'none';
+                    resolve();
+                };
+
+                // Handle close button
+                document.getElementById('closeDuplicate').onclick = () => {
+                    modal.style.display = 'none';
+                    resolve();
+                };
+            });
         }
 
         // Upload outfits function

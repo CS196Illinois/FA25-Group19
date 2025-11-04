@@ -80,15 +80,50 @@ async def upload_image(file: UploadFile = File(...), category: str = Form(...)):
         # Validate category
         if category not in ['top', 'bottom']:
             raise HTTPException(status_code=400, detail="Category must be 'top' or 'bottom'")
-        
+
         image_data = await file.read()
         embedding = get_image_embedding(image_data)
+        filename = file.filename
 
         # Convert embedding to bytes (to store in SQLite)
         embedding_bytes = pickle.dumps(embedding.tolist())
-        filename = file.filename
 
-        # Insert image into DB with category
+        # CHECK 1: Detect duplicate filename
+        existing_images = get_all_images(category)
+        for existing_img in existing_images:
+            if existing_img["filename"] == filename:
+                # Duplicate filename found - return 409 Conflict with details
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "type": "filename_duplicate",
+                        "message": f"Filename '{filename}' already exists in {category}s",
+                        "existing_id": existing_img["id"],
+                        "existing_filename": existing_img["filename"]
+                    }
+                )
+
+        # CHECK 2: Detect duplicate content using embedding similarity
+        similarity_threshold = 0.95
+        all_embeddings = get_all_embeddings(category)
+        for existing_id, existing_filename, existing_embedding_bytes in all_embeddings:
+            existing_embedding = torch.tensor(pickle.loads(existing_embedding_bytes))
+            similarity = F.cosine_similarity(embedding, existing_embedding).item()
+
+            if similarity > similarity_threshold:
+                # Duplicate content found - return 409 Conflict with details
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "type": "content_duplicate",
+                        "message": f"This image looks identical to '{existing_filename}' ({similarity*100:.1f}% similar)",
+                        "existing_id": existing_id,
+                        "existing_filename": existing_filename,
+                        "similarity_score": round(similarity, 4)
+                    }
+                )
+
+        # Both checks passed - insert image into DB with category
         image_id = insert_image(filename, image_data, embedding_bytes, category)
 
         # Compute similarity with all existing images in the same category
@@ -98,7 +133,7 @@ async def upload_image(file: UploadFile = File(...), category: str = Form(...)):
                 continue
             existing_embedding = torch.tensor(pickle.loads(img_embedding_bytes))
             similarity = F.cosine_similarity(embedding, existing_embedding).item()
-            
+
             # Store similarity based on category
             if category == 'top':
                 insert_similarity(image_id, img_id, similarity)
@@ -106,7 +141,7 @@ async def upload_image(file: UploadFile = File(...), category: str = Form(...)):
                 insert_similarity(img_id, image_id, similarity)
 
         return {
-            "filename": filename, 
+            "filename": filename,
             "message": f"Image uploaded successfully to {category}s",
             "id": image_id,
             "category": category
