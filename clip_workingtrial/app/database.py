@@ -44,6 +44,17 @@ def init_db():
     )
     """)
 
+    # Table to store complete outfits (photo of person wearing full outfit)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS outfits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        outfit_image_data BLOB,
+        top_embedding BLOB,
+        bottom_embedding BLOB,
+        uploaded_at TEXT
+    )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -126,3 +137,47 @@ def insert_similarity(top_id, bottom_id, similarity):
     """, (top_id, bottom_id, similarity))
     conn.commit()
     conn.close()
+
+
+def insert_outfit(outfit_image_data, top_embedding, bottom_embedding):
+    """Insert a complete outfit with embeddings for top and bottom regions"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO outfits (outfit_image_data, top_embedding, bottom_embedding, uploaded_at)
+        VALUES (?, ?, ?, ?)
+    """, (outfit_image_data, bytes(top_embedding), bytes(bottom_embedding), datetime.now().isoformat()))
+    outfit_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return outfit_id
+
+
+def get_all_outfits():
+    """Get all outfits with metadata (no image data to keep response light)"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, uploaded_at FROM outfits")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": r[0], "uploaded_at": r[1]} for r in rows]
+
+
+def get_outfit_by_id(outfit_id):
+    """Get complete outfit data including image and embeddings"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, outfit_image_data, top_embedding, bottom_embedding, uploaded_at FROM outfits WHERE id = ?", (outfit_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return row
+
+
+def get_all_outfit_embeddings():
+    """Get all outfit embeddings for similarity search"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, top_embedding, bottom_embedding FROM outfits")
+    rows = cursor.fetchall()
+    conn.close()
+    return rows

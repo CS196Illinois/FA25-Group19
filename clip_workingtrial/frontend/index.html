@@ -22,7 +22,16 @@
         <div id="bottomsPreview" class="preview-container"></div>
         <button id="uploadBottomsBtn" style="display: none;">Upload Bottoms</button>
     </div>
-    
+
+    <!-- Outfits Upload Section -->
+    <div class="upload-section">
+        <h2>Upload Complete Outfits</h2>
+        <p style="font-size: 0.9em; color: #666; margin-top: -10px;">Upload photos of people wearing complete outfits (top + bottom)</p>
+        <input type="file" id="outfitsInput" accept="image/*" multiple>
+        <div id="outfitsPreview" class="preview-container"></div>
+        <button id="uploadOutfitsBtn" style="display: none;">Upload Outfits</button>
+    </div>
+
     <pre id="output"></pre>
     
     <!-- Gallery Section -->
@@ -37,7 +46,13 @@
         <button id="refreshBottoms">Refresh Bottoms</button>
         <div id="bottomsGallery" class="gallery-container"></div>
     </div>
-    
+
+    <div class="gallery-section">
+        <h2>Complete Outfits Database</h2>
+        <button id="refreshOutfits">Refresh Outfits</button>
+        <div id="outfitsGallery" class="gallery-container"></div>
+    </div>
+
     <!-- Generate Outfits Section -->
     <div class="gallery-section">
         <h2>Generate Outfits</h2>
@@ -46,6 +61,7 @@
             <button id="generatePickedBtn">Generate Based on Picked Clothing</button>
             <button id="generateSimilarityBtn">Generate for Me (Similarity)</button>
             <button id="generateDatasetBtn">Generate for Me (Dataset)</button>
+            <button id="findOutfitFromItemBtn" style="background-color: #4CAF50;">Find Outfit From My Item</button>
         </div>
     </div>
 
@@ -89,23 +105,94 @@
         </div>
     </div>
 
+    <!-- Find Outfit From Item Modal -->
+    <div id="findOutfitModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" id="closeFindOutfit">&times;</span>
+            <h2 style="text-align: center; margin-bottom: 20px;">Find Outfit From Your Item</h2>
+            <div style="padding: 20px;">
+                <p style="margin-bottom: 15px;">Upload a clothing item to find a matching complete outfit:</p>
+                <div style="margin-bottom: 15px;">
+                    <label>Select Category:</label><br>
+                    <select id="findOutfitCategory" style="padding: 8px; margin-top: 5px; width: 100%; font-size: 16px;">
+                        <option value="top">Top</option>
+                        <option value="bottom">Bottom</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label>Upload Image:</label><br>
+                    <input type="file" id="findOutfitFileInput" accept="image/*" style="margin-top: 5px;">
+                </div>
+                <div id="findOutfitPreview" style="margin-bottom: 15px; text-align: center;"></div>
+                <button id="findOutfitSearchBtn" style="width: 100%; padding: 12px; font-size: 16px;">Search for Matching Outfit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Found Outfit Result Modal -->
+    <div id="foundOutfitModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" id="closeFoundOutfit">&times;</span>
+            <h2 style="text-align: center; margin-bottom: 20px;">Recommendation From Your Closet</h2>
+            <div style="padding: 20px;">
+                <p id="foundOutfitMessage" style="font-size: 1.1em; margin-bottom: 20px; text-align: center;"></p>
+
+                <div class="outfit-display" style="display: flex; justify-content: space-around; gap: 30px; margin: 20px 0;">
+                    <div class="outfit-item" style="flex: 1; text-align: center;">
+                        <h4>Your Item</h4>
+                        <img id="uploadedItemImg" style="max-width: 200px; height: auto; border-radius: 8px;" alt="Your clothing item">
+                        <p id="uploadedItemCategory" style="margin-top: 10px; font-weight: bold;"></p>
+                    </div>
+
+                    <div style="display: flex; align-items: center; font-size: 2em; color: #666;">+</div>
+
+                    <div class="outfit-item" style="flex: 1; text-align: center;">
+                        <h4>Recommended Match</h4>
+                        <img id="recommendedItemImg" style="max-width: 200px; height: auto; border-radius: 8px;" alt="Recommended item">
+                        <p id="recommendedItemName" style="margin-top: 10px; font-weight: bold;"></p>
+                        <p id="recommendedItemSimilarity" style="margin-top: 5px; font-size: 0.9em; color: #666;"></p>
+                    </div>
+                </div>
+
+                <div id="confidenceWarning" style="background-color: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 8px; margin-top: 20px; display: none;">
+                    <strong>⚠️ Low Confidence Match</strong>
+                    <p id="confidenceMessage" style="margin: 5px 0 0 0;"></p>
+                </div>
+
+                <div style="text-align: center; margin-top: 20px;">
+                    <button id="viewReferenceOutfitBtn" style="padding: 10px 20px; font-size: 14px; background-color: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                        View Reference Outfit
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let topsFiles = [];
         let bottomsFiles = [];
+        let outfitsFiles = [];
         let selectedItem = null; // {id: number, category: 'top'|'bottom'}
-        
+
         // Handle tops file selection
         document.getElementById('topsInput').addEventListener('change', (e) => {
             topsFiles = Array.from(e.target.files);
             displayPreviews(topsFiles, 'topsPreview');
             document.getElementById('uploadTopsBtn').style.display = topsFiles.length > 0 ? 'block' : 'none';
         });
-        
+
         // Handle bottoms file selection
         document.getElementById('bottomsInput').addEventListener('change', (e) => {
             bottomsFiles = Array.from(e.target.files);
             displayPreviews(bottomsFiles, 'bottomsPreview');
             document.getElementById('uploadBottomsBtn').style.display = bottomsFiles.length > 0 ? 'block' : 'none';
+        });
+
+        // Handle outfits file selection
+        document.getElementById('outfitsInput').addEventListener('change', (e) => {
+            outfitsFiles = Array.from(e.target.files);
+            displayPreviews(outfitsFiles, 'outfitsPreview');
+            document.getElementById('uploadOutfitsBtn').style.display = outfitsFiles.length > 0 ? 'block' : 'none';
         });
         
         // Display image previews
@@ -140,10 +227,14 @@
                 topsFiles.splice(index, 1);
                 displayPreviews(topsFiles, 'topsPreview');
                 document.getElementById('uploadTopsBtn').style.display = topsFiles.length > 0 ? 'block' : 'none';
-            } else {
+            } else if (containerId === 'bottomsPreview') {
                 bottomsFiles.splice(index, 1);
                 displayPreviews(bottomsFiles, 'bottomsPreview');
                 document.getElementById('uploadBottomsBtn').style.display = bottomsFiles.length > 0 ? 'block' : 'none';
+            } else if (containerId === 'outfitsPreview') {
+                outfitsFiles.splice(index, 1);
+                displayPreviews(outfitsFiles, 'outfitsPreview');
+                document.getElementById('uploadOutfitsBtn').style.display = outfitsFiles.length > 0 ? 'block' : 'none';
             }
         }
         
@@ -166,7 +257,17 @@
             document.getElementById('uploadBottomsBtn').style.display = 'none';
             loadGallery('bottom');
         });
-        
+
+        // Upload outfits
+        document.getElementById('uploadOutfitsBtn').addEventListener('click', async () => {
+            await uploadOutfits(outfitsFiles);
+            outfitsFiles = [];
+            document.getElementById('outfitsPreview').innerHTML = '';
+            document.getElementById('outfitsInput').value = '';
+            document.getElementById('uploadOutfitsBtn').style.display = 'none';
+            loadOutfitGallery();
+        });
+
         // Upload images function
         async function uploadImages(files, category) {
             const results = [];
@@ -188,7 +289,28 @@
             }
             document.getElementById('output').textContent = JSON.stringify(results, null, 2);
         }
-        
+
+        // Upload outfits function
+        async function uploadOutfits(files) {
+            const results = [];
+            for (const file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/upload-outfit/', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const result = await response.json();
+                    results.push(result);
+                } catch (error) {
+                    console.error('Outfit upload error:', error);
+                }
+            }
+            document.getElementById('output').textContent = JSON.stringify(results, null, 2);
+        }
+
         // Load gallery
         async function loadGallery(category) {
             try {
@@ -223,7 +345,35 @@
                 console.error('Error loading gallery:', error);
             }
         }
-        
+
+        // Load outfit gallery
+        async function loadOutfitGallery() {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/get-outfits/');
+                const outfits = await response.json();
+                const container = document.getElementById('outfitsGallery');
+                container.innerHTML = '';
+
+                for (const outfit of outfits) {
+                    const galleryItem = document.createElement('div');
+                    galleryItem.className = 'gallery-item';
+
+                    const imgElement = document.createElement('img');
+                    imgElement.src = `http://127.0.0.1:8000/get-outfit/${outfit.id}`;
+
+                    const info = document.createElement('div');
+                    info.className = 'filename';
+                    info.textContent = `Outfit #${outfit.id}`;
+
+                    galleryItem.appendChild(imgElement);
+                    galleryItem.appendChild(info);
+                    container.appendChild(galleryItem);
+                }
+            } catch (error) {
+                console.error('Error loading outfit gallery:', error);
+            }
+        }
+
         // Delete image
         async function deleteImage(imageId, category) {
             if (!confirm('Are you sure you want to delete this image?')) {
@@ -245,11 +395,13 @@
         // Refresh buttons
         document.getElementById('refreshTops').addEventListener('click', () => loadGallery('top'));
         document.getElementById('refreshBottoms').addEventListener('click', () => loadGallery('bottom'));
-        
+        document.getElementById('refreshOutfits').addEventListener('click', () => loadOutfitGallery());
+
         // Load galleries on page load
         window.addEventListener('load', () => {
             loadGallery('top');
             loadGallery('bottom');
+            loadOutfitGallery();
         });
         
         // Modal functionality
@@ -257,6 +409,10 @@
         const closeModal = document.getElementById('closeModal');
         const wardrobeModal = document.getElementById('wardrobeModal');
         const closeWardrobe = document.getElementById('closeWardrobe');
+        const findOutfitModal = document.getElementById('findOutfitModal');
+        const closeFindOutfit = document.getElementById('closeFindOutfit');
+        const foundOutfitModal = document.getElementById('foundOutfitModal');
+        const closeFoundOutfit = document.getElementById('closeFoundOutfit');
 
         // Close outfit modal when X is clicked
         closeModal.onclick = function() {
@@ -269,6 +425,18 @@
             selectedItem = null;
         }
 
+        // Close find outfit modal when X is clicked
+        closeFindOutfit.onclick = function() {
+            findOutfitModal.style.display = 'none';
+            document.getElementById('findOutfitFileInput').value = '';
+            document.getElementById('findOutfitPreview').innerHTML = '';
+        }
+
+        // Close found outfit modal when X is clicked
+        closeFoundOutfit.onclick = function() {
+            foundOutfitModal.style.display = 'none';
+        }
+
         // Close modal when clicking outside of it
         window.onclick = function(event) {
             if (event.target === modal) {
@@ -277,6 +445,14 @@
             if (event.target === wardrobeModal) {
                 wardrobeModal.style.display = 'none';
                 selectedItem = null;
+            }
+            if (event.target === findOutfitModal) {
+                findOutfitModal.style.display = 'none';
+                document.getElementById('findOutfitFileInput').value = '';
+                document.getElementById('findOutfitPreview').innerHTML = '';
+            }
+            if (event.target === foundOutfitModal) {
+                foundOutfitModal.style.display = 'none';
             }
         }
 
@@ -468,6 +644,109 @@
         document.getElementById('generateDatasetBtn').addEventListener('click', () => {
             console.log('Generate for Me (Dataset) clicked');
             // TODO: Add dataset-based outfit generation functionality
+        });
+
+        // Find Outfit From Item button
+        document.getElementById('findOutfitFromItemBtn').addEventListener('click', () => {
+            findOutfitModal.style.display = 'block';
+        });
+
+        // Store uploaded item data for display
+        let uploadedItemData = null;
+
+        // Handle file selection for find outfit - store preview data
+        document.getElementById('findOutfitFileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    uploadedItemData = event.target.result;
+                    const preview = document.getElementById('findOutfitPreview');
+                    preview.innerHTML = `<img src="${uploadedItemData}" style="max-width: 200px; max-height: 200px; border-radius: 8px;">`;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Search for matching outfit
+        document.getElementById('findOutfitSearchBtn').addEventListener('click', async () => {
+            const fileInput = document.getElementById('findOutfitFileInput');
+            const category = document.getElementById('findOutfitCategory').value;
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Please select an image first');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('category', category);
+
+            try {
+                document.getElementById('findOutfitSearchBtn').textContent = 'Searching...';
+                document.getElementById('findOutfitSearchBtn').disabled = true;
+
+                const response = await fetch('http://127.0.0.1:8000/find-outfit-by-item/', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    alert(error.detail || 'Failed to find matching outfit');
+                    return;
+                }
+
+                const result = await response.json();
+
+                // Close the find outfit modal
+                findOutfitModal.style.display = 'none';
+
+                // Display the recommendation from user's closet
+                document.getElementById('foundOutfitMessage').textContent = result.message;
+
+                // Show uploaded item
+                document.getElementById('uploadedItemImg').src = uploadedItemData;
+                document.getElementById('uploadedItemCategory').textContent =
+                    `Your ${category.charAt(0).toUpperCase() + category.slice(1)}`;
+
+                // Show recommended item from closet
+                document.getElementById('recommendedItemImg').src =
+                    `http://127.0.0.1:8000/get-image/${result.recommended_item.category}/${result.recommended_item.id}`;
+                document.getElementById('recommendedItemName').textContent = result.recommended_item.filename;
+                document.getElementById('recommendedItemSimilarity').textContent =
+                    `Match Score: ${(result.recommended_item.similarity_to_outfit * 100).toFixed(1)}%`;
+
+                // Handle confidence warnings
+                const confidenceWarning = document.getElementById('confidenceWarning');
+                if (result.confidence === 'low') {
+                    confidenceWarning.style.display = 'block';
+                    document.getElementById('confidenceMessage').textContent = result.confidence_message;
+                } else {
+                    confidenceWarning.style.display = 'none';
+                }
+
+                // Store reference outfit ID for viewing
+                document.getElementById('viewReferenceOutfitBtn').onclick = () => {
+                    window.open(`http://127.0.0.1:8000/get-outfit/${result.outfit_reference_id}`, '_blank');
+                };
+
+                // Show the result modal
+                foundOutfitModal.style.display = 'block';
+
+                // Reset form
+                fileInput.value = '';
+                document.getElementById('findOutfitPreview').innerHTML = '';
+                uploadedItemData = null;
+
+            } catch (error) {
+                console.error('Error finding outfit:', error);
+                alert('An error occurred while searching for outfit. Please try again.');
+            } finally {
+                document.getElementById('findOutfitSearchBtn').textContent = 'Search for Matching Outfit';
+                document.getElementById('findOutfitSearchBtn').disabled = false;
+            }
         });
     </script>
 </body>

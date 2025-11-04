@@ -9,8 +9,9 @@ import torch.nn.functional as F
 import pickle
 
 from app.database import (
-    init_db, insert_image, get_all_embeddings, insert_similarity, 
-    get_all_images, get_image_by_id, delete_image
+    init_db, insert_image, get_all_embeddings, insert_similarity,
+    get_all_images, get_image_by_id, delete_image,
+    insert_outfit, get_all_outfits, get_outfit_by_id, get_all_outfit_embeddings
 )
 
 app = FastAPI()
@@ -44,6 +45,33 @@ def get_image_embedding(image_data):
         image_features = model.encode_image(image)
         image_features /= image_features.norm(dim=-1, keepdim=True)
     return image_features.cpu()
+
+def split_and_embed_outfit(image_data):
+    """
+    Split outfit image into top and bottom halves, generate embeddings for each.
+    Uses simple geometric split: top 50% = top garment, bottom 50% = bottom garment.
+    """
+    # Open the outfit image
+    outfit_image = Image.open(BytesIO(image_data))
+    width, height = outfit_image.size
+
+    # Crop top half (top garment region)
+    top_crop = outfit_image.crop((0, 0, width, height // 2))
+
+    # Crop bottom half (bottom garment region)
+    bottom_crop = outfit_image.crop((0, height // 2, width, height))
+
+    # Generate CLIP embeddings for each region
+    # Convert crops back to bytes for processing
+    top_buffer = BytesIO()
+    top_crop.save(top_buffer, format='PNG')
+    top_embedding = get_image_embedding(top_buffer.getvalue())
+
+    bottom_buffer = BytesIO()
+    bottom_crop.save(bottom_buffer, format='PNG')
+    bottom_embedding = get_image_embedding(bottom_buffer.getvalue())
+
+    return top_embedding, bottom_embedding
 
 @app.post("/upload-image/")
 async def upload_image(file: UploadFile = File(...), category: str = Form(...)):
@@ -266,7 +294,177 @@ async def generate_picked_outfit(request: dict):
                 "bottom": selected_item_info,
                 "similarity_score": highest_similarity
             }
-    
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/upload-outfit/")
+async def upload_outfit(file: UploadFile = File(...)):
+    """
+    Upload a complete outfit image (photo of person wearing full outfit).
+    The image will be split into top/bottom halves and embeddings generated for each.
+    """
+    try:
+        outfit_image_data = await file.read()
+
+        # Split image and generate embeddings for top and bottom regions
+        top_embedding, bottom_embedding = split_and_embed_outfit(outfit_image_data)
+
+        # Convert embeddings to bytes for storage
+        top_embedding_bytes = pickle.dumps(top_embedding.tolist())
+        bottom_embedding_bytes = pickle.dumps(bottom_embedding.tolist())
+
+        # Store outfit in database
+        outfit_id = insert_outfit(outfit_image_data, top_embedding_bytes, bottom_embedding_bytes)
+
+        return {
+            "message": "Outfit uploaded successfully",
+            "outfit_id": outfit_id,
+            "filename": file.filename
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload outfit: {str(e)}")
+
+@app.post("/find-outfit-by-item/")
+async def find_outfit_by_item(file: UploadFile = File(...), category: str = Form(...)):
+    """
+    Upload a single clothing item and get a recommendation from your closet.
+
+    Workflow:
+    1. Find an outfit with similar item in the specified category
+    2. Get the opposite piece from that outfit (if you uploaded top, get outfit's bottom)
+    3. Search YOUR closet for items similar to that outfit piece
+    4. Return recommendation from your actual wardrobe
+
+    Args:
+        file: Image of a single clothing item (top or bottom)
+        category: 'top' or 'bottom' - which type of clothing item this is
+
+    Returns:
+        Recommendation with item from user's closet and confidence level
+    """
+    try:
+        # Validate category
+        if category not in ['top', 'bottom']:
+            raise HTTPException(status_code=400, detail="Category must be 'top' or 'bottom'")
+
+        # Get all outfit embeddings
+        outfit_embeddings = get_all_outfit_embeddings()
+        if not outfit_embeddings:
+            raise HTTPException(status_code=404, detail="No outfits in database to search")
+
+        # Generate embedding for the uploaded item
+        item_image_data = await file.read()
+        item_embedding = get_image_embedding(item_image_data)
+
+        # STEP 1: Search through all outfits to find best match for uploaded item
+        best_outfit_id = None
+        highest_outfit_similarity = -1
+        best_outfit_opposite_embedding = None
+
+        for outfit_id, top_embedding_bytes, bottom_embedding_bytes in outfit_embeddings:
+            # Choose which embedding to compare based on category
+            if category == 'top':
+                outfit_embedding = torch.tensor(pickle.loads(top_embedding_bytes))
+                opposite_embedding_bytes = bottom_embedding_bytes
+            else:  # category == 'bottom'
+                outfit_embedding = torch.tensor(pickle.loads(bottom_embedding_bytes))
+                opposite_embedding_bytes = top_embedding_bytes
+
+            # Compute similarity
+            similarity = F.cosine_similarity(item_embedding, outfit_embedding).item()
+
+            if similarity > highest_outfit_similarity:
+                highest_outfit_similarity = similarity
+                best_outfit_id = outfit_id
+                best_outfit_opposite_embedding = torch.tensor(pickle.loads(opposite_embedding_bytes))
+
+        if best_outfit_id is None:
+            raise HTTPException(status_code=404, detail="Could not find matching outfit")
+
+        # STEP 2: Now search user's closet for items similar to the outfit's opposite piece
+        opposite_category = 'bottom' if category == 'top' else 'top'
+        closet_items = get_all_embeddings(opposite_category)
+
+        if not closet_items:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No {opposite_category}s in your closet. Upload some {opposite_category}s first!"
+            )
+
+        # Find best match from user's closet
+        best_closet_item_id = None
+        best_closet_item_name = None
+        highest_closet_similarity = -1
+
+        for closet_item_id, closet_item_name, closet_embedding_bytes in closet_items:
+            closet_embedding = torch.tensor(pickle.loads(closet_embedding_bytes))
+            similarity = F.cosine_similarity(best_outfit_opposite_embedding, closet_embedding).item()
+
+            if similarity > highest_closet_similarity:
+                highest_closet_similarity = similarity
+                best_closet_item_id = closet_item_id
+                best_closet_item_name = closet_item_name
+
+        if best_closet_item_id is None:
+            raise HTTPException(status_code=404, detail=f"Could not find matching {opposite_category} in your closet")
+
+        # STEP 3: Determine confidence level
+        confidence = "high" if highest_closet_similarity > 0.6 else "low"
+        confidence_message = ""
+        if confidence == "low":
+            confidence_message = f"This is the closest match from your closet ({highest_closet_similarity*100:.1f}%), but it's not very similar to the styled outfit."
+
+        # Get full closet item data
+        closet_item_data = get_image_by_id(best_closet_item_id, opposite_category)
+
+        return {
+            "message": f"Based on outfits with similar {category}s, here's what to pair it with from your closet",
+            "outfit_reference_id": best_outfit_id,
+            "outfit_similarity": highest_outfit_similarity,
+            "uploaded_item_category": category,
+            "recommended_item": {
+                "id": best_closet_item_id,
+                "filename": best_closet_item_name,
+                "category": opposite_category,
+                "similarity_to_outfit": highest_closet_similarity
+            },
+            "confidence": confidence,
+            "confidence_message": confidence_message
+        }
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to find outfit: {str(e)}")
+
+@app.get("/get-outfits/")
+def get_outfits():
+    """
+    Get list of all uploaded outfits (metadata only, no image data).
+    """
+    try:
+        return get_all_outfits()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch outfits: {str(e)}")
+
+@app.get("/get-outfit/{outfit_id}")
+async def get_outfit(outfit_id: int):
+    """
+    Get a specific outfit image by ID and return as binary image.
+    """
+    try:
+        outfit_data = get_outfit_by_id(outfit_id)
+        if outfit_data is None:
+            raise HTTPException(status_code=404, detail="Outfit not found")
+
+        # outfit_data is tuple: (id, outfit_image_data, top_embedding, bottom_embedding, uploaded_at)
+        # Return the outfit image binary data (index 1)
+        return Response(content=outfit_data[1], media_type="image/jpeg")
+
     except HTTPException as he:
         raise he
     except Exception as e:
