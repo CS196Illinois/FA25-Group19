@@ -124,9 +124,9 @@
                 </div>
             </div>
 
-            <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+            <div id="duplicateButtonContainer" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
                 <button id="duplicateOverwriteBtn" style="background-color: #ff6b6b; padding: 10px 20px; border: none; border-radius: 5px; color: white; cursor: pointer;">Overwrite</button>
-                <button id="duplicateRenameBtn" style="background-color: #4CAF50; padding: 10px 20px; border: none; border-radius: 5px; color: white; cursor: pointer;">Rename</button>
+                <button id="duplicateRenameBtn" style="background-color: #4CAF50; padding: 10px 20px; border: none; border-radius: 5px; color: white; cursor: pointer; display: none;">Rename</button>
                 <button id="duplicateCancelBtn" style="background-color: #999; padding: 10px 20px; border: none; border-radius: 5px; color: white; cursor: pointer;">Cancel</button>
             </div>
 
@@ -363,6 +363,14 @@
                 // Reset rename input
                 renameInputContainer.style.display = 'none';
                 renameInput.value = '';
+
+                // Show/hide Rename button based on duplicate type
+                // Only show Rename for filename duplicates, not for content duplicates
+                if (duplicateData.type === 'filename_duplicate') {
+                    renameBtn.style.display = 'block';
+                } else {
+                    renameBtn.style.display = 'none';
+                }
 
                 // Show modal
                 modal.style.display = 'block';
