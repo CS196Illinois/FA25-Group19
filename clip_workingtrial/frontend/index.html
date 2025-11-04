@@ -366,11 +366,8 @@
 
                 // Show/hide Rename button based on duplicate type
                 // Only show Rename for filename duplicates, not for content duplicates
-                if (duplicateData.type === 'filename_duplicate') {
-                    renameBtn.style.display = 'block';
-                } else {
-                    renameBtn.style.display = 'none';
-                }
+                // Content duplicates (same image) means renaming won't help - still same image
+                renameBtn.style.display = (duplicateData.type === 'filename_duplicate') ? 'block' : 'none';
 
                 // Show modal
                 modal.style.display = 'block';
