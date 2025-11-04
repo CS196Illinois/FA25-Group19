@@ -1,0 +1,9 @@
+uvicorn
+fastapi
+torch
+Pillow
+python-multipart
+git+https://github.com/openai/CLIP.git
+ftfy regex tqdm
+torch torchvision torchaudio
+numpy
