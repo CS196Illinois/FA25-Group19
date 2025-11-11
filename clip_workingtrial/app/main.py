@@ -7,6 +7,7 @@ import clip
 from io import BytesIO
 import torch.nn.functional as F
 import pickle
+from transformers import YolosImageProcessor, YolosForObjectDetection
 
 from app.database import (
     init_db, insert_image, get_all_embeddings, insert_similarity,
@@ -39,6 +40,11 @@ init_db()
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load("ViT-B/32", device=device)
 
+# Load the YOLOS fashion detection model
+fashion_model_id = 'yainage90/fashion-object-detection-yolos-tiny'
+fashion_processor = YolosImageProcessor.from_pretrained(fashion_model_id)
+fashion_model = YolosForObjectDetection.from_pretrained(fashion_model_id).to(device)
+
 def get_image_embedding(image_data):
     image = preprocess(Image.open(BytesIO(image_data))).unsqueeze(0).to(device)
     with torch.no_grad():
@@ -67,6 +73,62 @@ def split_and_embed_outfit(image_data):
     top_crop.save(top_buffer, format='PNG')
     top_embedding = get_image_embedding(top_buffer.getvalue())
 
+    bottom_buffer = BytesIO()
+    bottom_crop.save(bottom_buffer, format='PNG')
+    bottom_embedding = get_image_embedding(bottom_buffer.getvalue())
+
+    return top_embedding, bottom_embedding
+
+def detect_and_embed_outfit(image_data):
+    """
+    Use YOLOS to detect tops and bottoms in outfit image, then generate CLIP embeddings.
+    More accurate than geometric splitting - detects actual garment regions.
+    Falls back to geometric split if detection fails.
+    """
+    # Open the outfit image
+    outfit_image = Image.open(BytesIO(image_data))
+
+    # Run YOLOS fashion detection
+    inputs = fashion_processor(images=[outfit_image], return_tensors="pt")
+    outputs = fashion_model(**inputs.to(device))
+
+    # Post-process detection results
+    results = fashion_processor.post_process_object_detection(
+        outputs,
+        threshold=0.5,  # confidence threshold
+        target_sizes=torch.tensor([[outfit_image.size[1], outfit_image.size[0]]])
+    )[0]
+
+    # Find best top and bottom detections
+    best_top = None
+    best_bottom = None
+
+    for score, label, box in zip(results["scores"], results["labels"], results["boxes"]):
+        class_name = fashion_model.config.id2label[label.item()]
+        confidence = score.item()
+
+        if class_name == 'top':
+            if best_top is None or confidence > best_top['conf']:
+                best_top = {'box': box.tolist(), 'conf': confidence}
+        elif class_name == 'bottom':
+            if best_bottom is None or confidence > best_bottom['conf']:
+                best_bottom = {'box': box.tolist(), 'conf': confidence}
+
+    # If detection failed, fall back to geometric split
+    if best_top is None or best_bottom is None:
+        print("YOLOS detection failed, falling back to geometric split")
+        return split_and_embed_outfit(image_data)
+
+    # Crop detected top region
+    x1, y1, x2, y2 = [int(coord) for coord in best_top['box']]
+    top_crop = outfit_image.crop((x1, y1, x2, y2))
+    top_buffer = BytesIO()
+    top_crop.save(top_buffer, format='PNG')
+    top_embedding = get_image_embedding(top_buffer.getvalue())
+
+    # Crop detected bottom region
+    x1, y1, x2, y2 = [int(coord) for coord in best_bottom['box']]
+    bottom_crop = outfit_image.crop((x1, y1, x2, y2))
     bottom_buffer = BytesIO()
     bottom_crop.save(bottom_buffer, format='PNG')
     bottom_embedding = get_image_embedding(bottom_buffer.getvalue())
@@ -115,6 +177,34 @@ async def upload_image(file: UploadFile = File(...), category: str = Form(...)):
         raise he
     except Exception as e:
         return {"error": f"An error occurred during upload: {e}"}
+
+@app.post("/upload-outfit/")
+async def upload_outfit(file: UploadFile = File(...)):
+    """
+    Upload a complete outfit image (person wearing top + bottom).
+    Uses YOLOS to detect and crop top/bottom regions, stores as linked outfit.
+    """
+    try:
+        image_data = await file.read()
+
+        # Use YOLOS to detect and embed top and bottom
+        top_embedding, bottom_embedding = detect_and_embed_outfit(image_data)
+
+        # Convert embeddings to bytes
+        top_embedding_bytes = pickle.dumps(top_embedding.tolist())
+        bottom_embedding_bytes = pickle.dumps(bottom_embedding.tolist())
+
+        # Insert into outfits table (keeps top and bottom linked)
+        outfit_id = insert_outfit(image_data, top_embedding_bytes, bottom_embedding_bytes)
+
+        return {
+            "filename": file.filename,
+            "message": "Outfit uploaded successfully - top and bottom detected and linked",
+            "outfit_id": outfit_id
+        }
+
+    except Exception as e:
+        return {"error": f"An error occurred during outfit upload: {e}"}
 
 # Route to calculate and return similarity score
 @app.post("/compare-images/")
@@ -193,10 +283,39 @@ async def delete_image_endpoint(category: str, image_id: int):
         # Validate category
         if category not in ['top', 'bottom']:
             raise HTTPException(status_code=400, detail="Category must be 'top' or 'bottom'")
-        
+
         delete_image(image_id, category)
         return {"message": f"Image {image_id} deleted successfully from {category}s"}
-    
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/get-outfits/")
+def get_outfits():
+    """
+    Get all complete outfits (metadata only, no image data)
+    """
+    try:
+        return get_all_outfits()
+    except Exception as e:
+        return {"error": f"Failed to fetch outfits: {e}"}
+
+@app.get("/get-outfit/{outfit_id}")
+async def get_outfit(outfit_id: int):
+    """
+    Get complete outfit image by id
+    """
+    try:
+        outfit_data = get_outfit_by_id(outfit_id)
+        if outfit_data is None:
+            raise HTTPException(status_code=404, detail="Outfit not found")
+
+        # outfit_data is a tuple: (id, outfit_image_data, top_embedding, bottom_embedding, uploaded_at)
+        # Return the outfit image binary data (index 1)
+        return Response(content=outfit_data[1], media_type="image/jpeg")
+
     except HTTPException as he:
         raise he
     except Exception as e:
@@ -240,60 +359,97 @@ async def generate_picked_outfit(request: dict):
         opposite_items = get_all_images(opposite_category)
         if not opposite_items:
             raise HTTPException(status_code=404, detail=f"No {opposite_category}s available in the database")
-        
-        # Find the item with highest similarity
-        best_match = None
-        highest_similarity = -1
-        
+
+        # Find top 5 items with highest similarity to selected item
+        matches_with_scores = []
+
         opposite_embeddings = get_all_embeddings(opposite_category)
         for opposite_id, opposite_filename, opposite_embedding_bytes in opposite_embeddings:
             opposite_embedding = torch.tensor(pickle.loads(opposite_embedding_bytes))
             similarity = F.cosine_similarity(selected_embedding, opposite_embedding).item()
-            
-            if similarity > highest_similarity:
-                highest_similarity = similarity
-                best_match = {
-                    "id": opposite_id,
-                    "filename": opposite_filename
-                }
-        
-        if best_match is None:
+
+            matches_with_scores.append({
+                "id": opposite_id,
+                "filename": opposite_filename,
+                "similarity": similarity,
+                "embedding": opposite_embedding
+            })
+
+        # Sort by similarity descending and take top 5
+        matches_with_scores.sort(key=lambda x: x["similarity"], reverse=True)
+        top_5_matches = matches_with_scores[:5]
+
+        if not top_5_matches:
             raise HTTPException(status_code=404, detail=f"Could not find matching {opposite_category}")
-        
-        # Get full details for best match
-        best_match_full = next((item for item in opposite_items if item["id"] == best_match["id"]), None)
-        
-        # Construct response based on which item was selected
-        if item_category == 'top':
-            selected_item_info = {
-                "id": selected_item_data[0],
-                "filename": selected_item_data[1],
-                "uploaded_at": next((item["uploaded_at"] for item in get_all_images('top') if item["id"] == item_id), None)
-            }
-            return {
-                "top": selected_item_info,
-                "bottom": {
-                    "id": best_match_full["id"],
-                    "filename": best_match_full["filename"],
-                    "uploaded_at": best_match_full["uploaded_at"]
-                },
-                "similarity_score": highest_similarity
-            }
-        else:  # item_category == 'bottom'
-            selected_item_info = {
-                "id": selected_item_data[0],
-                "filename": selected_item_data[1],
-                "uploaded_at": next((item["uploaded_at"] for item in get_all_images('bottom') if item["id"] == item_id), None)
-            }
-            return {
-                "top": {
-                    "id": best_match_full["id"],
-                    "filename": best_match_full["filename"],
-                    "uploaded_at": best_match_full["uploaded_at"]
-                },
-                "bottom": selected_item_info,
-                "similarity_score": highest_similarity
-            }
+
+        # For each of the top 5 matches, find 3 variations (the match itself + 2 similar items)
+        outfit_suggestions = []
+
+        for main_match in top_5_matches:
+            # Find items similar to this match (variations)
+            variations = []
+
+            for candidate_id, candidate_filename, candidate_embedding_bytes in opposite_embeddings:
+                if candidate_id == main_match["id"]:
+                    continue  # Skip the main match itself when finding variations
+
+                candidate_embedding = torch.tensor(pickle.loads(candidate_embedding_bytes))
+                variation_similarity = F.cosine_similarity(main_match["embedding"], candidate_embedding).item()
+
+                variations.append({
+                    "id": candidate_id,
+                    "filename": candidate_filename,
+                    "similarity_to_main": variation_similarity
+                })
+
+            # Sort variations and take top 2
+            variations.sort(key=lambda x: x["similarity_to_main"], reverse=True)
+            top_2_variations = variations[:2]
+
+            # Add main match + 2 variations to suggestions
+            outfit_variations = [
+                {
+                    "id": main_match["id"],
+                    "filename": main_match["filename"],
+                    "similarity_to_selected": main_match["similarity"]
+                }
+            ]
+
+            for var in top_2_variations:
+                outfit_variations.append({
+                    "id": var["id"],
+                    "filename": var["filename"],
+                    "similarity_to_selected": main_match["similarity"]  # Use main match similarity
+                })
+
+            outfit_suggestions.extend(outfit_variations)
+
+        # Get selected item info
+        selected_item_info = {
+            "id": selected_item_data[0],
+            "filename": selected_item_data[1],
+            "uploaded_at": next((item["uploaded_at"] for item in get_all_images(item_category) if item["id"] == item_id), None)
+        }
+
+        # Build list of all outfit suggestions with full details
+        all_suggestions = []
+        for suggestion in outfit_suggestions:
+            match_full = next((item for item in opposite_items if item["id"] == suggestion["id"]), None)
+            if match_full:
+                all_suggestions.append({
+                    "id": match_full["id"],
+                    "filename": match_full["filename"],
+                    "uploaded_at": match_full["uploaded_at"],
+                    "similarity_score": suggestion["similarity_to_selected"]
+                })
+
+        # Return selected item + all suggestions
+        return {
+            "selected_item": selected_item_info,
+            "selected_category": item_category,
+            "suggestions": all_suggestions,
+            "opposite_category": opposite_category
+        }
 
     except HTTPException as he:
         raise he
@@ -360,10 +516,8 @@ async def find_outfit_by_item(file: UploadFile = File(...), category: str = Form
         item_image_data = await file.read()
         item_embedding = get_image_embedding(item_image_data)
 
-        # STEP 1: Search through all outfits to find best match for uploaded item
-        best_outfit_id = None
-        highest_outfit_similarity = -1
-        best_outfit_opposite_embedding = None
+        # STEP 1: Find top 5 best matching outfits for uploaded item
+        outfit_matches = []
 
         for outfit_id, top_embedding_bytes, bottom_embedding_bytes in outfit_embeddings:
             # Choose which embedding to compare based on category
@@ -377,15 +531,20 @@ async def find_outfit_by_item(file: UploadFile = File(...), category: str = Form
             # Compute similarity
             similarity = F.cosine_similarity(item_embedding, outfit_embedding).item()
 
-            if similarity > highest_outfit_similarity:
-                highest_outfit_similarity = similarity
-                best_outfit_id = outfit_id
-                best_outfit_opposite_embedding = torch.tensor(pickle.loads(opposite_embedding_bytes))
+            outfit_matches.append({
+                "outfit_id": outfit_id,
+                "similarity": similarity,
+                "opposite_embedding": torch.tensor(pickle.loads(opposite_embedding_bytes))
+            })
 
-        if best_outfit_id is None:
+        # Sort by similarity descending and take top 5 outfits
+        outfit_matches.sort(key=lambda x: x["similarity"], reverse=True)
+        top_5_outfits = outfit_matches[:5]
+
+        if not top_5_outfits:
             raise HTTPException(status_code=404, detail="Could not find matching outfit")
 
-        # STEP 2: Now search user's closet for items similar to the outfit's opposite piece
+        # STEP 2: For each of the 5 best outfits, find 3 best matching items from closet
         opposite_category = 'bottom' if category == 'top' else 'top'
         closet_items = get_all_embeddings(opposite_category)
 
@@ -395,43 +554,50 @@ async def find_outfit_by_item(file: UploadFile = File(...), category: str = Form
                 detail=f"No {opposite_category}s in your closet. Upload some {opposite_category}s first!"
             )
 
-        # Find best match from user's closet
-        best_closet_item_id = None
-        best_closet_item_name = None
-        highest_closet_similarity = -1
+        all_suggestions = []
 
-        for closet_item_id, closet_item_name, closet_embedding_bytes in closet_items:
-            closet_embedding = torch.tensor(pickle.loads(closet_embedding_bytes))
-            similarity = F.cosine_similarity(best_outfit_opposite_embedding, closet_embedding).item()
+        for outfit_match in top_5_outfits:
+            # For this specific outfit, find best 3 closet items
+            closet_matches = []
 
-            if similarity > highest_closet_similarity:
-                highest_closet_similarity = similarity
-                best_closet_item_id = closet_item_id
-                best_closet_item_name = closet_item_name
+            for closet_item_id, closet_item_name, closet_embedding_bytes in closet_items:
+                closet_embedding = torch.tensor(pickle.loads(closet_embedding_bytes))
+                similarity = F.cosine_similarity(outfit_match["opposite_embedding"], closet_embedding).item()
 
-        if best_closet_item_id is None:
-            raise HTTPException(status_code=404, detail=f"Could not find matching {opposite_category} in your closet")
+                closet_matches.append({
+                    "id": closet_item_id,
+                    "filename": closet_item_name,
+                    "similarity": similarity,
+                    "outfit_id": outfit_match["outfit_id"]
+                })
 
-        # STEP 3: Determine confidence level
-        confidence = "high" if highest_closet_similarity > 0.6 else "low"
+            # Sort by similarity and take top 3 for this outfit
+            closet_matches.sort(key=lambda x: x["similarity"], reverse=True)
+            top_3_closet_items = closet_matches[:3]
+
+            # Add these 3 suggestions
+            for closet_item in top_3_closet_items:
+                all_suggestions.append({
+                    "id": closet_item["id"],
+                    "filename": closet_item["filename"],
+                    "similarity_to_outfit": closet_item["similarity"],
+                    "reference_outfit_id": closet_item["outfit_id"]
+                })
+
+        # Determine confidence level based on best match
+        best_similarity = all_suggestions[0]["similarity_to_outfit"] if all_suggestions else 0
+        confidence = "high" if best_similarity > 0.6 else "low"
         confidence_message = ""
         if confidence == "low":
-            confidence_message = f"This is the closest match from your closet ({highest_closet_similarity*100:.1f}%), but it's not very similar to the styled outfit."
-
-        # Get full closet item data
-        closet_item_data = get_image_by_id(best_closet_item_id, opposite_category)
+            confidence_message = f"These are the closest matches from your closet ({best_similarity*100:.1f}%), but they're not very similar to the styled outfit."
 
         return {
-            "message": f"Based on outfits with similar {category}s, here's what to pair it with from your closet",
-            "outfit_reference_id": best_outfit_id,
-            "outfit_similarity": highest_outfit_similarity,
+            "message": f"Based on outfits with similar {category}s, here are suggestions from your closet",
+            "outfit_reference_id": top_5_outfits[0]["outfit_id"],  # First/best outfit
+            "outfit_similarity": top_5_outfits[0]["similarity"],
             "uploaded_item_category": category,
-            "recommended_item": {
-                "id": best_closet_item_id,
-                "filename": best_closet_item_name,
-                "category": opposite_category,
-                "similarity_to_outfit": highest_closet_similarity
-            },
+            "opposite_category": opposite_category,
+            "suggestions": all_suggestions,
             "confidence": confidence,
             "confidence_message": confidence_message
         }

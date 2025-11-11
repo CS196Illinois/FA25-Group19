@@ -70,6 +70,7 @@
         <div class="modal-content">
             <span class="close-modal" id="closeModal">&times;</span>
             <h2 style="text-align: center; margin-bottom: 20px;">Your Generated Outfit</h2>
+            <p id="outfitCounter" style="text-align: center; color: #666; margin-bottom: 10px;">Outfit 1 of 15</p>
             <div class="outfit-display">
                 <div class="outfit-item">
                     <h4>Top</h4>
@@ -81,6 +82,9 @@
                     <img id="outfitBottomImg" alt="Bottom clothing item">
                     <p id="outfitBottomName"></p>
                 </div>
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button id="nextOutfitBtn" style="padding: 10px 30px; font-size: 16px; cursor: pointer;">Next</button>
             </div>
         </div>
     </div>
@@ -134,6 +138,7 @@
         <div class="modal-content">
             <span class="close-modal" id="closeFoundOutfit">&times;</span>
             <h2 style="text-align: center; margin-bottom: 20px;">Recommendation From Your Closet</h2>
+            <p id="foundOutfitCounter" style="text-align: center; color: #666; margin-bottom: 10px;">Outfit 1 of 15</p>
             <div style="padding: 20px;">
                 <p id="foundOutfitMessage" style="font-size: 1.1em; margin-bottom: 20px; text-align: center;"></p>
 
@@ -159,10 +164,11 @@
                     <p id="confidenceMessage" style="margin: 5px 0 0 0;"></p>
                 </div>
 
-                <div style="text-align: center; margin-top: 20px;">
+                <div style="text-align: center; margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
                     <button id="viewReferenceOutfitBtn" style="padding: 10px 20px; font-size: 14px; background-color: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">
                         View Reference Outfit
                     </button>
+                    <button id="nextFoundOutfitBtn" style="padding: 10px 30px; font-size: 16px; cursor: pointer;">Next</button>
                 </div>
             </div>
         </div>
@@ -531,10 +537,69 @@
             return item;
         }
 
+        // Variables for outfit cycling
+        let outfitSuggestions = [];
+        let currentOutfitIndex = 0;
+        let selectedItemData = null;
+        let selectedCategory = null;
+        let oppositeCategory = null;
+
+        // Function to display current outfit
+        function displayCurrentOutfit() {
+            if (!outfitSuggestions || outfitSuggestions.length === 0) {
+                return;
+            }
+
+            const currentSuggestion = outfitSuggestions[currentOutfitIndex];
+            const totalOutfits = outfitSuggestions.length;
+
+            // Update counter
+            document.getElementById('outfitCounter').textContent = `Outfit ${currentOutfitIndex + 1} of ${totalOutfits}`;
+
+            // Display images based on selected category
+            if (selectedCategory === 'top') {
+                // Selected a top, showing different bottoms
+                document.getElementById('outfitTopImg').src = `http://127.0.0.1:8000/get-image/top/${selectedItemData.id}`;
+                document.getElementById('outfitTopName').textContent = selectedItemData.filename;
+
+                document.getElementById('outfitBottomImg').src = `http://127.0.0.1:8000/get-image/bottom/${currentSuggestion.id}`;
+                document.getElementById('outfitBottomName').textContent = currentSuggestion.filename;
+            } else {
+                // Selected a bottom, showing different tops
+                document.getElementById('outfitTopImg').src = `http://127.0.0.1:8000/get-image/top/${currentSuggestion.id}`;
+                document.getElementById('outfitTopName').textContent = currentSuggestion.filename;
+
+                document.getElementById('outfitBottomImg').src = `http://127.0.0.1:8000/get-image/bottom/${selectedItemData.id}`;
+                document.getElementById('outfitBottomName').textContent = selectedItemData.filename;
+            }
+
+            // Show/hide Next button and update text
+            const nextBtn = document.getElementById('nextOutfitBtn');
+            if (currentOutfitIndex >= totalOutfits - 1) {
+                nextBtn.textContent = 'No more outfit suggestions!';
+                nextBtn.disabled = true;
+                nextBtn.style.opacity = '0.5';
+                nextBtn.style.cursor = 'not-allowed';
+            } else {
+                nextBtn.textContent = 'Next';
+                nextBtn.disabled = false;
+                nextBtn.style.opacity = '1';
+                nextBtn.style.cursor = 'pointer';
+            }
+        }
+
+        // Next outfit button handler
+        document.getElementById('nextOutfitBtn').addEventListener('click', () => {
+            if (currentOutfitIndex < outfitSuggestions.length - 1) {
+                currentOutfitIndex++;
+                displayCurrentOutfit();
+            }
+        });
+
         // Confirm wardrobe selection and generate outfit
         document.getElementById('wardrobeConfirmBtn').addEventListener('click', async () => {
             if (!selectedItem) return;
-            
+
             try {
                 const response = await fetch('http://127.0.0.1:8000/generate-picked-outfit/', {
                     method: 'POST',
@@ -546,32 +611,35 @@
                         item_category: selectedItem.category
                     })
                 });
-                
+
                 if (!response.ok) {
                     const error = await response.json();
                     alert(error.detail || 'Failed to generate outfit');
                     return;
                 }
-                
-                const outfit = await response.json();
-                
+
+                const result = await response.json();
+
+                // Store outfit data
+                outfitSuggestions = result.suggestions;
+                selectedItemData = result.selected_item;
+                selectedCategory = result.selected_category;
+                oppositeCategory = result.opposite_category;
+                currentOutfitIndex = 0;
+
                 // Close wardrobe modal
                 wardrobeModal.style.display = 'none';
-                
-                // Display outfit in result modal
-                document.getElementById('outfitTopImg').src = `http://127.0.0.1:8000/get-image/top/${outfit.top.id}`;
-                document.getElementById('outfitTopName').textContent = outfit.top.filename;
-                
-                document.getElementById('outfitBottomImg').src = `http://127.0.0.1:8000/get-image/bottom/${outfit.bottom.id}`;
-                document.getElementById('outfitBottomName').textContent = outfit.bottom.filename;
-                
+
+                // Display first outfit
+                displayCurrentOutfit();
+
                 // Show outfit modal
                 modal.style.display = 'block';
-                
+
                 // Reset selection
                 selectedItem = null;
                 document.getElementById('wardrobeConfirmBtn').disabled = true;
-                
+
             } catch (error) {
                 console.error('Error generating outfit:', error);
                 alert('Failed to generate outfit');
@@ -669,6 +737,68 @@
         });
 
         // Search for matching outfit
+        // Variables for found outfit cycling
+        let foundOutfitSuggestions = [];
+        let currentFoundOutfitIndex = 0;
+        let foundOutfitData = null;
+
+        // Function to display current found outfit
+        function displayCurrentFoundOutfit() {
+            if (!foundOutfitSuggestions || foundOutfitSuggestions.length === 0) {
+                return;
+            }
+
+            const currentSuggestion = foundOutfitSuggestions[currentFoundOutfitIndex];
+            const totalOutfits = foundOutfitSuggestions.length;
+
+            // Calculate which outfit group we're in (1-5)
+            const outfitGroup = Math.floor(currentFoundOutfitIndex / 3) + 1;
+            const variationInGroup = (currentFoundOutfitIndex % 3) + 1;
+
+            // Update counter
+            document.getElementById('foundOutfitCounter').textContent =
+                `Outfit ${currentFoundOutfitIndex + 1} of ${totalOutfits} (Reference Outfit ${outfitGroup}, Match ${variationInGroup}/3)`;
+
+            // Show uploaded item
+            document.getElementById('uploadedItemImg').src = uploadedItemData;
+            document.getElementById('uploadedItemCategory').textContent =
+                `Your ${foundOutfitData.uploaded_item_category.charAt(0).toUpperCase() + foundOutfitData.uploaded_item_category.slice(1)}`;
+
+            // Show recommended item from closet
+            document.getElementById('recommendedItemImg').src =
+                `http://127.0.0.1:8000/get-image/${foundOutfitData.opposite_category}/${currentSuggestion.id}`;
+            document.getElementById('recommendedItemName').textContent = currentSuggestion.filename;
+            document.getElementById('recommendedItemSimilarity').textContent =
+                `Match Score: ${(currentSuggestion.similarity_to_outfit * 100).toFixed(1)}%`;
+
+            // Update View Reference Outfit button to show current reference outfit
+            document.getElementById('viewReferenceOutfitBtn').onclick = () => {
+                window.open(`http://127.0.0.1:8000/get-outfit/${currentSuggestion.reference_outfit_id}`, '_blank');
+            };
+
+            // Show/hide Next button and update text
+            const nextBtn = document.getElementById('nextFoundOutfitBtn');
+            if (currentFoundOutfitIndex >= totalOutfits - 1) {
+                nextBtn.textContent = 'No more outfit suggestions!';
+                nextBtn.disabled = true;
+                nextBtn.style.opacity = '0.5';
+                nextBtn.style.cursor = 'not-allowed';
+            } else {
+                nextBtn.textContent = 'Next';
+                nextBtn.disabled = false;
+                nextBtn.style.opacity = '1';
+                nextBtn.style.cursor = 'pointer';
+            }
+        }
+
+        // Next found outfit button handler
+        document.getElementById('nextFoundOutfitBtn').addEventListener('click', () => {
+            if (currentFoundOutfitIndex < foundOutfitSuggestions.length - 1) {
+                currentFoundOutfitIndex++;
+                displayCurrentFoundOutfit();
+            }
+        });
+
         document.getElementById('findOutfitSearchBtn').addEventListener('click', async () => {
             const fileInput = document.getElementById('findOutfitFileInput');
             const category = document.getElementById('findOutfitCategory').value;
@@ -700,23 +830,16 @@
 
                 const result = await response.json();
 
+                // Store outfit data for cycling
+                foundOutfitSuggestions = result.suggestions;
+                currentFoundOutfitIndex = 0;
+                foundOutfitData = result;
+
                 // Close the find outfit modal
                 findOutfitModal.style.display = 'none';
 
                 // Display the recommendation from user's closet
                 document.getElementById('foundOutfitMessage').textContent = result.message;
-
-                // Show uploaded item
-                document.getElementById('uploadedItemImg').src = uploadedItemData;
-                document.getElementById('uploadedItemCategory').textContent =
-                    `Your ${category.charAt(0).toUpperCase() + category.slice(1)}`;
-
-                // Show recommended item from closet
-                document.getElementById('recommendedItemImg').src =
-                    `http://127.0.0.1:8000/get-image/${result.recommended_item.category}/${result.recommended_item.id}`;
-                document.getElementById('recommendedItemName').textContent = result.recommended_item.filename;
-                document.getElementById('recommendedItemSimilarity').textContent =
-                    `Match Score: ${(result.recommended_item.similarity_to_outfit * 100).toFixed(1)}%`;
 
                 // Handle confidence warnings
                 const confidenceWarning = document.getElementById('confidenceWarning');
@@ -727,10 +850,8 @@
                     confidenceWarning.style.display = 'none';
                 }
 
-                // Store reference outfit ID for viewing
-                document.getElementById('viewReferenceOutfitBtn').onclick = () => {
-                    window.open(`http://127.0.0.1:8000/get-outfit/${result.outfit_reference_id}`, '_blank');
-                };
+                // Display first outfit (this will also set the reference outfit button)
+                displayCurrentFoundOutfit();
 
                 // Show the result modal
                 foundOutfitModal.style.display = 'block';
@@ -738,7 +859,7 @@
                 // Reset form
                 fileInput.value = '';
                 document.getElementById('findOutfitPreview').innerHTML = '';
-                uploadedItemData = null;
+                // Don't reset uploadedItemData yet - we need it for cycling
 
             } catch (error) {
                 console.error('Error finding outfit:', error);
