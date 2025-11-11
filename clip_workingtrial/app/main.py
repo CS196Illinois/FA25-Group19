@@ -7,10 +7,9 @@ import clip
 from io import BytesIO
 import torch.nn.functional as F
 import pickle
-import random
 
 from app.database import (
-    init_db, insert_image, get_all_embeddings, insert_similarity,
+    init_db, insert_image, get_all_embeddings, insert_similarity, 
     get_all_images, get_image_by_id, delete_image
 )
 
@@ -166,125 +165,108 @@ async def delete_image_endpoint(category: str, image_id: int):
         # Validate category
         if category not in ['top', 'bottom']:
             raise HTTPException(status_code=400, detail="Category must be 'top' or 'bottom'")
-
+        
         delete_image(image_id, category)
         return {"message": f"Image {image_id} deleted successfully from {category}s"}
-
+    
     except HTTPException as he:
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/generate-random-outfit/")
-async def generate_random_outfit():
+@app.post("/generate-picked-outfit/")
+async def generate_picked_outfit(request: dict):
     """
-    Generate a random outfit by selecting one random top and one random bottom
-    """
-    try:
-        # Get all tops and bottoms
-        tops = get_all_images('top')
-        bottoms = get_all_images('bottom')
-
-        # Handle edge cases
-        if not tops and not bottoms:
-            raise HTTPException(status_code=404, detail="No tops or bottoms available in the database")
-
-        if not tops:
-            raise HTTPException(status_code=404, detail="No tops available in the database")
-
-        if not bottoms:
-            raise HTTPException(status_code=404, detail="No bottoms available in the database")
-
-        # Randomly select one top and one bottom
-        random_top = random.choice(tops)
-        random_bottom = random.choice(bottoms)
-
-        return {
-            "top": {
-                "id": random_top["id"],
-                "filename": random_top["filename"],
-                "uploaded_at": random_top["uploaded_at"]
-            },
-            "bottom": {
-                "id": random_bottom["id"],
-                "filename": random_bottom["filename"],
-                "uploaded_at": random_bottom["uploaded_at"]
-            }
-        }
-
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/generate-similarity-outfit/")
-async def generate_similarity_outfit():
-    """
-    Generate an outfit by selecting a random top and finding the bottom with highest similarity
+    Generate an outfit based on a user-selected item (top or bottom).
+    Finds the best matching item from the opposite category.
+    
+    Expected request body:
+    {
+        "item_id": int,
+        "item_category": "top" | "bottom"
+    }
     """
     try:
-        # Get all tops and bottoms
-        tops = get_all_images('top')
-        bottoms = get_all_images('bottom')
-
-        # Handle edge cases
-        if not tops and not bottoms:
-            raise HTTPException(status_code=404, detail="No tops or bottoms available in the database")
-
-        if not tops:
-            raise HTTPException(status_code=404, detail="No tops available in the database")
-
-        if not bottoms:
-            raise HTTPException(status_code=404, detail="No bottoms available in the database")
-
-        # Randomly select one top
-        random_top = random.choice(tops)
-
-        # Get the top's embedding
-        top_data = get_image_by_id(random_top["id"], 'top')
-        if top_data is None:
-            raise HTTPException(status_code=404, detail="Selected top not found")
-
-        # top_data is tuple: (id, filename, image_data, embedding)
-        top_embedding = torch.tensor(pickle.loads(top_data[3]))
-
-        # Find the bottom with highest similarity to the selected top
-        best_bottom = None
+        item_id = request.get("item_id")
+        item_category = request.get("item_category")
+        
+        # Validate inputs
+        if not item_id or not item_category:
+            raise HTTPException(status_code=400, detail="item_id and item_category are required")
+        
+        if item_category not in ['top', 'bottom']:
+            raise HTTPException(status_code=400, detail="item_category must be 'top' or 'bottom'")
+        
+        # Get the selected item's data
+        selected_item_data = get_image_by_id(item_id, item_category)
+        if selected_item_data is None:
+            raise HTTPException(status_code=404, detail=f"Selected {item_category} not found")
+        
+        # selected_item_data is tuple: (id, filename, image_data, embedding)
+        selected_embedding = torch.tensor(pickle.loads(selected_item_data[3]))
+        
+        # Determine the opposite category
+        opposite_category = 'bottom' if item_category == 'top' else 'top'
+        
+        # Get all items from the opposite category
+        opposite_items = get_all_images(opposite_category)
+        if not opposite_items:
+            raise HTTPException(status_code=404, detail=f"No {opposite_category}s available in the database")
+        
+        # Find the item with highest similarity
+        best_match = None
         highest_similarity = -1
-
-        bottom_embeddings = get_all_embeddings('bottom')
-        for bottom_id, bottom_filename, bottom_embedding_bytes in bottom_embeddings:
-            bottom_embedding = torch.tensor(pickle.loads(bottom_embedding_bytes))
-            similarity = F.cosine_similarity(top_embedding, bottom_embedding).item()
-
+        
+        opposite_embeddings = get_all_embeddings(opposite_category)
+        for opposite_id, opposite_filename, opposite_embedding_bytes in opposite_embeddings:
+            opposite_embedding = torch.tensor(pickle.loads(opposite_embedding_bytes))
+            similarity = F.cosine_similarity(selected_embedding, opposite_embedding).item()
+            
             if similarity > highest_similarity:
                 highest_similarity = similarity
-                best_bottom = {
-                    "id": bottom_id,
-                    "filename": bottom_filename
+                best_match = {
+                    "id": opposite_id,
+                    "filename": opposite_filename
                 }
-
-        # Get the full bottom details
-        if best_bottom is None:
-            raise HTTPException(status_code=404, detail="Could not find matching bottom")
-
-        # Find the bottom in the bottoms list to get uploaded_at
-        best_bottom_full = next((b for b in bottoms if b["id"] == best_bottom["id"]), None)
-
-        return {
-            "top": {
-                "id": random_top["id"],
-                "filename": random_top["filename"],
-                "uploaded_at": random_top["uploaded_at"]
-            },
-            "bottom": {
-                "id": best_bottom_full["id"],
-                "filename": best_bottom_full["filename"],
-                "uploaded_at": best_bottom_full["uploaded_at"]
-            },
-            "similarity_score": highest_similarity
-        }
-
+        
+        if best_match is None:
+            raise HTTPException(status_code=404, detail=f"Could not find matching {opposite_category}")
+        
+        # Get full details for best match
+        best_match_full = next((item for item in opposite_items if item["id"] == best_match["id"]), None)
+        
+        # Construct response based on which item was selected
+        if item_category == 'top':
+            selected_item_info = {
+                "id": selected_item_data[0],
+                "filename": selected_item_data[1],
+                "uploaded_at": next((item["uploaded_at"] for item in get_all_images('top') if item["id"] == item_id), None)
+            }
+            return {
+                "top": selected_item_info,
+                "bottom": {
+                    "id": best_match_full["id"],
+                    "filename": best_match_full["filename"],
+                    "uploaded_at": best_match_full["uploaded_at"]
+                },
+                "similarity_score": highest_similarity
+            }
+        else:  # item_category == 'bottom'
+            selected_item_info = {
+                "id": selected_item_data[0],
+                "filename": selected_item_data[1],
+                "uploaded_at": next((item["uploaded_at"] for item in get_all_images('bottom') if item["id"] == item_id), None)
+            }
+            return {
+                "top": {
+                    "id": best_match_full["id"],
+                    "filename": best_match_full["filename"],
+                    "uploaded_at": best_match_full["uploaded_at"]
+                },
+                "bottom": selected_item_info,
+                "similarity_score": highest_similarity
+            }
+    
     except HTTPException as he:
         raise he
     except Exception as e:

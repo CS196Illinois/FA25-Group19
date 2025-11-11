@@ -2,192 +2,7 @@
 <html>
 <head>
     <title>CLIP Image Similarity - Tops & Bottoms</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .upload-section {
-            border: 2px solid #ddd;
-            padding: 20px;
-            margin-bottom: 30px;
-            border-radius: 8px;
-        }
-        
-        .preview-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin: 15px 0;
-        }
-        
-        .preview-item {
-            position: relative;
-            width: 150px;
-        }
-        
-        .preview-item img {
-            width: 150px;
-            height: 150px;
-            object-fit: cover;
-            border: 2px solid #ddd;
-            border-radius: 4px;
-        }
-        
-        .preview-item button {
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            background: red;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 25px;
-            height: 25px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        
-        .gallery-section {
-            margin-top: 40px;
-        }
-        
-        .gallery-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            margin-top: 15px;
-        }
-        
-        .gallery-item {
-            position: relative;
-            width: 200px;
-        }
-        
-        .gallery-item img {
-            width: 200px;
-            height: 200px;
-            object-fit: cover;
-            border: 2px solid #ddd;
-            border-radius: 4px;
-        }
-        
-        .gallery-item .delete-btn {
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            background: red;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 5px 10px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        
-        .gallery-item .filename {
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
-            word-wrap: break-word;
-        }
-        
-        button {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        
-        button:hover {
-            background: #0056b3;
-        }
-        
-        .delete-btn:hover {
-            background: darkred !important;
-        }
-        
-        input[type="file"] {
-            margin: 10px 0;
-        }
-        
-        h2 {
-            color: #333;
-            border-bottom: 2px solid #007bff;
-            padding-bottom: 10px;
-        }
-
-        /* Modal styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.6);
-        }
-
-        .modal-content {
-            background-color: white;
-            margin: 5% auto;
-            padding: 30px;
-            border-radius: 8px;
-            width: 80%;
-            max-width: 700px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        }
-
-        .close-modal {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .close-modal:hover {
-            color: #000;
-        }
-
-        .outfit-display {
-            display: flex;
-            gap: 30px;
-            justify-content: center;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }
-
-        .outfit-item {
-            text-align: center;
-        }
-
-        .outfit-item h4 {
-            margin-bottom: 10px;
-            color: #333;
-        }
-
-        .outfit-item img {
-            width: 250px;
-            height: 250px;
-            object-fit: cover;
-            border: 3px solid #007bff;
-            border-radius: 8px;
-        }
-
-        .outfit-item p {
-            font-size: 14px;
-            color: #666;
-            margin-top: 10px;
-        }
-    </style>
+    <link rel="stylesheet" type="text/css" href="style.css">
 </head>
 <body>
     <h1>Upload Clothing Images</h1>
@@ -254,9 +69,30 @@
         </div>
     </div>
 
+    <!-- Wardrobe selection modal -->
+    <div id="wardrobeModal" class="modal">
+        <div class="wardrobe-modal-content">
+            <span class="close-modal" id="closeWardrobe">&times;</span>
+            <h2 style="text-align: center; margin-bottom: 20px;">Wardrobe</h2>
+            
+            <div class="wardrobe-section">
+                <h3>Tops</h3>
+                <div id="wardrobeTopsGrid" class="wardrobe-grid"></div>
+            </div>
+            
+            <div class="wardrobe-section">
+                <h3>Bottoms</h3>
+                <div id="wardrobeBottomsGrid" class="wardrobe-grid"></div>
+            </div>
+            
+            <button id="wardrobeConfirmBtn" class="wardrobe-confirm-btn" disabled>Confirm</button>
+        </div>
+    </div>
+
     <script>
         let topsFiles = [];
         let bottomsFiles = [];
+        let selectedItem = null; // {id: number, category: 'top'|'bottom'}
         
         // Handle tops file selection
         document.getElementById('topsInput').addEventListener('change', (e) => {
@@ -419,10 +255,18 @@
         // Modal functionality
         const modal = document.getElementById('outfitModal');
         const closeModal = document.getElementById('closeModal');
+        const wardrobeModal = document.getElementById('wardrobeModal');
+        const closeWardrobe = document.getElementById('closeWardrobe');
 
-        // Close modal when X is clicked
+        // Close outfit modal when X is clicked
         closeModal.onclick = function() {
             modal.style.display = 'none';
+        }
+
+        // Close wardrobe modal when X is clicked
+        closeWardrobe.onclick = function() {
+            wardrobeModal.style.display = 'none';
+            selectedItem = null;
         }
 
         // Close modal when clicking outside of it
@@ -430,7 +274,133 @@
             if (event.target === modal) {
                 modal.style.display = 'none';
             }
+            if (event.target === wardrobeModal) {
+                wardrobeModal.style.display = 'none';
+                selectedItem = null;
+            }
         }
+
+        // Load wardrobe items into modal
+        async function loadWardrobeModal() {
+            try {
+                // Fetch tops and bottoms
+                const topsResponse = await fetch('http://127.0.0.1:8000/get-images/top');
+                const bottomsResponse = await fetch('http://127.0.0.1:8000/get-images/bottom');
+                
+                const tops = await topsResponse.json();
+                const bottoms = await bottomsResponse.json();
+                
+                // Populate tops grid
+                const topsGrid = document.getElementById('wardrobeTopsGrid');
+                topsGrid.innerHTML = '';
+                tops.forEach(top => {
+                    const item = createWardrobeItem(top, 'top');
+                    topsGrid.appendChild(item);
+                });
+                
+                // Populate bottoms grid
+                const bottomsGrid = document.getElementById('wardrobeBottomsGrid');
+                bottomsGrid.innerHTML = '';
+                bottoms.forEach(bottom => {
+                    const item = createWardrobeItem(bottom, 'bottom');
+                    bottomsGrid.appendChild(item);
+                });
+                
+                // Show modal
+                wardrobeModal.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error loading wardrobe:', error);
+                alert('Failed to load wardrobe items');
+            }
+        }
+
+        // Create wardrobe item element
+        function createWardrobeItem(itemData, category) {
+            const item = document.createElement('div');
+            item.className = 'wardrobe-item';
+            item.dataset.id = itemData.id;
+            item.dataset.category = category;
+            
+            const img = document.createElement('img');
+            img.src = `http://127.0.0.1:8000/get-image/${category}/${itemData.id}`;
+            img.alt = itemData.filename;
+            
+            const name = document.createElement('div');
+            name.className = 'item-name';
+            name.textContent = itemData.filename;
+            
+            item.appendChild(img);
+            item.appendChild(name);
+            
+            // Click handler for selection
+            item.addEventListener('click', () => {
+                // Deselect all items
+                document.querySelectorAll('.wardrobe-item').forEach(el => {
+                    el.classList.remove('selected');
+                });
+                
+                // Select this item
+                item.classList.add('selected');
+                selectedItem = {
+                    id: itemData.id,
+                    category: category,
+                    filename: itemData.filename
+                };
+                
+                // Enable confirm button
+                document.getElementById('wardrobeConfirmBtn').disabled = false;
+            });
+            
+            return item;
+        }
+
+        // Confirm wardrobe selection and generate outfit
+        document.getElementById('wardrobeConfirmBtn').addEventListener('click', async () => {
+            if (!selectedItem) return;
+            
+            try {
+                const response = await fetch('http://127.0.0.1:8000/generate-picked-outfit/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        item_id: selectedItem.id,
+                        item_category: selectedItem.category
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    alert(error.detail || 'Failed to generate outfit');
+                    return;
+                }
+                
+                const outfit = await response.json();
+                
+                // Close wardrobe modal
+                wardrobeModal.style.display = 'none';
+                
+                // Display outfit in result modal
+                document.getElementById('outfitTopImg').src = `http://127.0.0.1:8000/get-image/top/${outfit.top.id}`;
+                document.getElementById('outfitTopName').textContent = outfit.top.filename;
+                
+                document.getElementById('outfitBottomImg').src = `http://127.0.0.1:8000/get-image/bottom/${outfit.bottom.id}`;
+                document.getElementById('outfitBottomName').textContent = outfit.bottom.filename;
+                
+                // Show outfit modal
+                modal.style.display = 'block';
+                
+                // Reset selection
+                selectedItem = null;
+                document.getElementById('wardrobeConfirmBtn').disabled = true;
+                
+            } catch (error) {
+                console.error('Error generating outfit:', error);
+                alert('Failed to generate outfit');
+            }
+        });
 
         // Generate Random Outfit
         document.getElementById('generateRandomBtn').addEventListener('click', async () => {
@@ -461,9 +431,9 @@
             }
         });
         
+        // Generate Based on Picked Clothing
         document.getElementById('generatePickedBtn').addEventListener('click', () => {
-            console.log('Generate Based on Picked Clothing clicked');
-            // TODO: Add picked clothing outfit generation functionality
+            loadWardrobeModal();
         });
         
         // Generate Similarity-Based Outfit
