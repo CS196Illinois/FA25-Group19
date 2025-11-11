@@ -11,36 +11,14 @@
     <div class="upload-section">
         <h2>Upload Tops</h2>
         <input type="file" id="topsInput" accept="image/*" multiple>
-        <div style="margin: 10px 0;">
-            <label>Temperature Tag:</label>
-            <select id="topsTemperatureTag" style="padding: 8px; margin-left: 10px; font-size: 16px;">
-                <option value="">-- Select (Optional) --</option>
-                <option value="cold">❄️ Cold (< 50°F / 10°C)</option>
-                <option value="cool">🍂 Cool (50-65°F / 10-18°C)</option>
-                <option value="mild">🌤️ Mild (65-75°F / 18-24°C)</option>
-                <option value="warm">☀️ Warm (75-85°F / 24-29°C)</option>
-                <option value="hot">🔥 Hot (> 85°F / 29°C)</option>
-            </select>
-        </div>
         <div id="topsPreview" class="preview-container"></div>
         <button id="uploadTopsBtn" style="display: none;">Upload Tops</button>
     </div>
-
+    
     <!-- Bottoms Upload Section -->
     <div class="upload-section">
         <h2>Upload Bottoms</h2>
         <input type="file" id="bottomsInput" accept="image/*" multiple>
-        <div style="margin: 10px 0;">
-            <label>Temperature Tag:</label>
-            <select id="bottomsTemperatureTag" style="padding: 8px; margin-left: 10px; font-size: 16px;">
-                <option value="">-- Select (Optional) --</option>
-                <option value="cold">❄️ Cold (< 50°F / 10°C)</option>
-                <option value="cool">🍂 Cool (50-65°F / 10-18°C)</option>
-                <option value="mild">🌤️ Mild (65-75°F / 18-24°C)</option>
-                <option value="warm">☀️ Warm (75-85°F / 24-29°C)</option>
-                <option value="hot">🔥 Hot (> 85°F / 29°C)</option>
-            </select>
-        </div>
         <div id="bottomsPreview" class="preview-container"></div>
         <button id="uploadBottomsBtn" style="display: none;">Upload Bottoms</button>
     </div>
@@ -108,93 +86,6 @@
             </div>
             
             <button id="wardrobeConfirmBtn" class="wardrobe-confirm-btn" disabled>Confirm</button>
-        </div>
-    </div>
-
-    <!-- Find Outfit From Item Modal -->
-    <div id="findOutfitModal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal" id="closeFindOutfit">&times;</span>
-            <h2 style="text-align: center; margin-bottom: 20px;">Find Outfit From Your Item</h2>
-            <div style="padding: 20px;">
-                <p style="margin-bottom: 15px;">Upload a clothing item to find a matching complete outfit:</p>
-                <div style="margin-bottom: 15px;">
-                    <label>Select Category:</label><br>
-                    <select id="findOutfitCategory" style="padding: 8px; margin-top: 5px; width: 100%; font-size: 16px;">
-                        <option value="top">Top</option>
-                        <option value="bottom">Bottom</option>
-                    </select>
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <label>Upload Image:</label><br>
-                    <input type="file" id="findOutfitFileInput" accept="image/*" style="margin-top: 5px;">
-                </div>
-                <div id="findOutfitPreview" style="margin-bottom: 15px; text-align: center;"></div>
-
-                <!-- Temperature inputs -->
-                <div style="margin-bottom: 15px; border-top: 1px solid #ddd; padding-top: 15px;">
-                    <h3 style="margin-bottom: 10px; font-size: 1.1em;">Weather Temperature (Optional)</h3>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                        <div>
-                            <label>Lowest Temp:</label><br>
-                            <input type="number" id="findOutfitLowTemp" placeholder="e.g., 72" style="padding: 8px; width: 100%; margin-top: 5px;">
-                        </div>
-                        <div>
-                            <label>Highest Temp:</label><br>
-                            <input type="number" id="findOutfitHighTemp" placeholder="e.g., 80" style="padding: 8px; width: 100%; margin-top: 5px;">
-                        </div>
-                        <div>
-                            <label>Unit:</label><br>
-                            <select id="findOutfitTempUnit" style="padding: 8px; width: 100%; margin-top: 5px; font-size: 16px;">
-                                <option value="fahrenheit">Fahrenheit</option>
-                                <option value="celsius">Celsius</option>
-                            </select>
-                        </div>
-                    </div>
-                    <p style="font-size: 0.85em; color: #666; margin-top: 5px;">Leave blank to search all clothing items</p>
-                </div>
-
-                <button id="findOutfitSearchBtn" style="width: 100%; padding: 12px; font-size: 16px;">Search for Matching Outfit</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Found Outfit Result Modal -->
-    <div id="foundOutfitModal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal" id="closeFoundOutfit">&times;</span>
-            <h2 style="text-align: center; margin-bottom: 20px;">Recommendation From Your Closet</h2>
-            <div style="padding: 20px;">
-                <p id="foundOutfitMessage" style="font-size: 1.1em; margin-bottom: 20px; text-align: center;"></p>
-
-                <div class="outfit-display" style="display: flex; justify-content: space-around; gap: 30px; margin: 20px 0;">
-                    <div class="outfit-item" style="flex: 1; text-align: center;">
-                        <h4>Your Item</h4>
-                        <img id="uploadedItemImg" style="max-width: 200px; height: auto; border-radius: 8px;" alt="Your clothing item">
-                        <p id="uploadedItemCategory" style="margin-top: 10px; font-weight: bold;"></p>
-                    </div>
-
-                    <div style="display: flex; align-items: center; font-size: 2em; color: #666;">+</div>
-
-                    <div class="outfit-item" style="flex: 1; text-align: center;">
-                        <h4>Recommended Match</h4>
-                        <img id="recommendedItemImg" style="max-width: 200px; height: auto; border-radius: 8px;" alt="Recommended item">
-                        <p id="recommendedItemName" style="margin-top: 10px; font-weight: bold;"></p>
-                        <p id="recommendedItemSimilarity" style="margin-top: 5px; font-size: 0.9em; color: #666;"></p>
-                    </div>
-                </div>
-
-                <div id="confidenceWarning" style="background-color: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 8px; margin-top: 20px; display: none;">
-                    <strong>⚠️ Low Confidence Match</strong>
-                    <p id="confidenceMessage" style="margin: 5px 0 0 0;"></p>
-                </div>
-
-                <div style="text-align: center; margin-top: 20px;">
-                    <button id="viewReferenceOutfitBtn" style="padding: 10px 20px; font-size: 14px; background-color: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                        View Reference Outfit
-                    </button>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -279,18 +170,11 @@
         // Upload images function
         async function uploadImages(files, category) {
             const results = [];
-            // Get temperature tag from the appropriate selector
-            const tempTagSelector = category === 'top' ? 'topsTemperatureTag' : 'bottomsTemperatureTag';
-            const temperatureTag = document.getElementById(tempTagSelector).value;
-
             for (const file of files) {
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('category', category);
-                if (temperatureTag) {
-                    formData.append('temperature_tag', temperatureTag);
-                }
-
+                
                 try {
                     const response = await fetch('http://127.0.0.1:8000/upload-image/', {
                         method: 'POST',
@@ -304,37 +188,7 @@
             }
             document.getElementById('output').textContent = JSON.stringify(results, null, 2);
         }
-
-        // Upload outfits function
-        async function uploadOutfits(files) {
-            const results = [];
-            for (const file of files) {
-                const formData = new FormData();
-                formData.append('file', file);
-
-                try {
-                    const response = await fetch('http://127.0.0.1:8000/upload-outfit/', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    const result = await response.json();
-                    results.push(result);
-                } catch (error) {
-                    console.error('Outfit upload error:', error);
-                }
-            }
-            document.getElementById('output').textContent = JSON.stringify(results, null, 2);
-        }
-
-        // Temperature tag emoji mapping
-        const tempEmojiMap = {
-            'cold': '❄️ Cold',
-            'cool': '🍂 Cool',
-            'mild': '🌤️ Mild',
-            'warm': '☀️ Warm',
-            'hot': '🔥 Hot'
-        };
-
+        
         // Load gallery
         async function loadGallery(category) {
             try {
@@ -343,133 +197,39 @@
                 const containerId = category === 'top' ? 'topsGallery' : 'bottomsGallery';
                 const container = document.getElementById(containerId);
                 container.innerHTML = '';
-
+                
                 for (const img of images) {
                     const galleryItem = document.createElement('div');
                     galleryItem.className = 'gallery-item';
-
+                    
                     const imgElement = document.createElement('img');
                     imgElement.src = `http://127.0.0.1:8000/get-image/${category}/${img.id}`;
-
+                    
                     const filename = document.createElement('div');
                     filename.className = 'filename';
                     filename.textContent = img.filename;
-
-                    // Temperature tag display
-                    const tempTagDisplay = document.createElement('div');
-                    tempTagDisplay.style.fontSize = '0.9em';
-                    tempTagDisplay.style.color = '#666';
-                    tempTagDisplay.style.marginTop = '5px';
-                    tempTagDisplay.textContent = img.temperature_tag
-                        ? tempEmojiMap[img.temperature_tag] || img.temperature_tag
-                        : 'No temp tag';
-
-                    // Edit temperature button
-                    const editTempBtn = document.createElement('button');
-                    editTempBtn.className = 'edit-temp-btn';
-                    editTempBtn.textContent = 'Edit Temp';
-                    editTempBtn.style.fontSize = '0.85em';
-                    editTempBtn.style.padding = '4px 8px';
-                    editTempBtn.style.marginTop = '5px';
-                    editTempBtn.style.marginRight = '5px';
-                    editTempBtn.onclick = () => editTemperatureTag(img.id, category, img.temperature_tag);
-
+                    
                     const deleteBtn = document.createElement('button');
                     deleteBtn.className = 'delete-btn';
                     deleteBtn.textContent = 'Delete';
                     deleteBtn.onclick = () => deleteImage(img.id, category);
-
+                    
                     galleryItem.appendChild(imgElement);
+                    galleryItem.appendChild(deleteBtn);
                     galleryItem.appendChild(filename);
-                    galleryItem.appendChild(tempTagDisplay);
-                    const buttonContainer = document.createElement('div');
-                    buttonContainer.appendChild(editTempBtn);
-                    buttonContainer.appendChild(deleteBtn);
-                    galleryItem.appendChild(buttonContainer);
                     container.appendChild(galleryItem);
                 }
             } catch (error) {
                 console.error('Error loading gallery:', error);
             }
         }
-
-        // Load outfit gallery
-        async function loadOutfitGallery() {
-            try {
-                const response = await fetch('http://127.0.0.1:8000/get-outfits/');
-                const outfits = await response.json();
-                const container = document.getElementById('outfitsGallery');
-                container.innerHTML = '';
-
-                for (const outfit of outfits) {
-                    const galleryItem = document.createElement('div');
-                    galleryItem.className = 'gallery-item';
-
-                    const imgElement = document.createElement('img');
-                    imgElement.src = `http://127.0.0.1:8000/get-outfit/${outfit.id}`;
-
-                    const info = document.createElement('div');
-                    info.className = 'filename';
-                    info.textContent = `Outfit #${outfit.id}`;
-
-                    galleryItem.appendChild(imgElement);
-                    galleryItem.appendChild(info);
-                    container.appendChild(galleryItem);
-                }
-            } catch (error) {
-                console.error('Error loading outfit gallery:', error);
-            }
-        }
-
-        // Edit temperature tag
-        async function editTemperatureTag(imageId, category, currentTag) {
-            const newTag = prompt(
-                `Select temperature tag for this item:\n\n` +
-                `Enter one of: cold, cool, mild, warm, hot\n` +
-                `Current tag: ${currentTag || 'none'}`,
-                currentTag || ''
-            );
-
-            if (newTag === null) {
-                return; // User cancelled
-            }
-
-            const validTags = ['cold', 'cool', 'mild', 'warm', 'hot'];
-            if (newTag && !validTags.includes(newTag.toLowerCase())) {
-                alert('Invalid temperature tag. Must be one of: cold, cool, mild, warm, hot');
-                return;
-            }
-
-            try {
-                const formData = new FormData();
-                formData.append('temperature_tag', newTag.toLowerCase());
-
-                const response = await fetch(`http://127.0.0.1:8000/update-temperature-tag/${category}/${imageId}`, {
-                    method: 'PATCH',
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    alert(error.detail || 'Failed to update temperature tag');
-                    return;
-                }
-
-                const result = await response.json();
-                document.getElementById('output').textContent = JSON.stringify(result, null, 2);
-                loadGallery(category);
-            } catch (error) {
-                console.error('Update temperature tag error:', error);
-                alert('Failed to update temperature tag');
-            }
-        }
-
+        
         // Delete image
         async function deleteImage(imageId, category) {
             if (!confirm('Are you sure you want to delete this image?')) {
                 return;
             }
-
+            
             try {
                 const response = await fetch(`http://127.0.0.1:8000/delete-image/${category}/${imageId}`, {
                     method: 'DELETE'
@@ -708,124 +468,6 @@
         document.getElementById('generateDatasetBtn').addEventListener('click', () => {
             console.log('Generate for Me (Dataset) clicked');
             // TODO: Add dataset-based outfit generation functionality
-        });
-
-        // Find Outfit From Item button
-        document.getElementById('findOutfitFromItemBtn').addEventListener('click', () => {
-            findOutfitModal.style.display = 'block';
-        });
-
-        // Store uploaded item data for display
-        let uploadedItemData = null;
-
-        // Handle file selection for find outfit - store preview data
-        document.getElementById('findOutfitFileInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    uploadedItemData = event.target.result;
-                    const preview = document.getElementById('findOutfitPreview');
-                    preview.innerHTML = `<img src="${uploadedItemData}" style="max-width: 200px; max-height: 200px; border-radius: 8px;">`;
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        // Search for matching outfit
-        document.getElementById('findOutfitSearchBtn').addEventListener('click', async () => {
-            const fileInput = document.getElementById('findOutfitFileInput');
-            const category = document.getElementById('findOutfitCategory').value;
-
-            if (!fileInput.files || fileInput.files.length === 0) {
-                alert('Please select an image first');
-                return;
-            }
-
-            const file = fileInput.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('category', category);
-
-            // Add temperature parameters if provided
-            const lowTemp = document.getElementById('findOutfitLowTemp').value;
-            const highTemp = document.getElementById('findOutfitHighTemp').value;
-            const tempUnit = document.getElementById('findOutfitTempUnit').value;
-
-            if (lowTemp || highTemp) {
-                if (!lowTemp || !highTemp) {
-                    alert('Please provide both lowest and highest temperatures, or leave both blank');
-                    return;
-                }
-                formData.append('low_temp', parseFloat(lowTemp));
-                formData.append('high_temp', parseFloat(highTemp));
-                formData.append('temp_unit', tempUnit);
-            }
-
-            try {
-                document.getElementById('findOutfitSearchBtn').textContent = 'Searching...';
-                document.getElementById('findOutfitSearchBtn').disabled = true;
-
-                const response = await fetch('http://127.0.0.1:8000/find-outfit-by-item/', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    alert(error.detail || 'Failed to find matching outfit');
-                    return;
-                }
-
-                const result = await response.json();
-
-                // Close the find outfit modal
-                findOutfitModal.style.display = 'none';
-
-                // Display the recommendation from user's closet
-                document.getElementById('foundOutfitMessage').textContent = result.message;
-
-                // Show uploaded item
-                document.getElementById('uploadedItemImg').src = uploadedItemData;
-                document.getElementById('uploadedItemCategory').textContent =
-                    `Your ${category.charAt(0).toUpperCase() + category.slice(1)}`;
-
-                // Show recommended item from closet
-                document.getElementById('recommendedItemImg').src =
-                    `http://127.0.0.1:8000/get-image/${result.recommended_item.category}/${result.recommended_item.id}`;
-                document.getElementById('recommendedItemName').textContent = result.recommended_item.filename;
-                document.getElementById('recommendedItemSimilarity').textContent =
-                    `Match Score: ${(result.recommended_item.similarity_to_outfit * 100).toFixed(1)}%`;
-
-                // Handle confidence warnings
-                const confidenceWarning = document.getElementById('confidenceWarning');
-                if (result.confidence === 'low') {
-                    confidenceWarning.style.display = 'block';
-                    document.getElementById('confidenceMessage').textContent = result.confidence_message;
-                } else {
-                    confidenceWarning.style.display = 'none';
-                }
-
-                // Store reference outfit ID for viewing
-                document.getElementById('viewReferenceOutfitBtn').onclick = () => {
-                    window.open(`http://127.0.0.1:8000/get-outfit/${result.outfit_reference_id}`, '_blank');
-                };
-
-                // Show the result modal
-                foundOutfitModal.style.display = 'block';
-
-                // Reset form
-                fileInput.value = '';
-                document.getElementById('findOutfitPreview').innerHTML = '';
-                uploadedItemData = null;
-
-            } catch (error) {
-                console.error('Error finding outfit:', error);
-                alert('An error occurred while searching for outfit. Please try again.');
-            } finally {
-                document.getElementById('findOutfitSearchBtn').textContent = 'Search for Matching Outfit';
-                document.getElementById('findOutfitSearchBtn').disabled = false;
-            }
         });
     </script>
 </body>
