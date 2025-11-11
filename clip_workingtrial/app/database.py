@@ -17,7 +17,8 @@ def init_db():
         filename TEXT UNIQUE,
         image_data BLOB,
         embedding BLOB,
-        uploaded_at TEXT
+        uploaded_at TEXT,
+        temperature_tag TEXT
     )
     """)
 
@@ -28,7 +29,8 @@ def init_db():
         filename TEXT UNIQUE,
         image_data BLOB,
         embedding BLOB,
-        uploaded_at TEXT
+        uploaded_at TEXT,
+        temperature_tag TEXT
     )
     """)
 
@@ -48,15 +50,15 @@ def init_db():
     conn.close()
 
 
-def insert_image(filename, image_data, embedding, category):
+def insert_image(filename, image_data, embedding, category, temperature_tag=None):
     """Insert image into tops or bottoms table based on category"""
     table = "tops" if category == "top" else "bottoms"
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute(f"""
-        INSERT OR REPLACE INTO {table} (filename, image_data, embedding, uploaded_at)
-        VALUES (?, ?, ?, ?)
-    """, (filename, image_data, bytes(embedding), datetime.now().isoformat()))
+        INSERT OR REPLACE INTO {table} (filename, image_data, embedding, uploaded_at, temperature_tag)
+        VALUES (?, ?, ?, ?, ?)
+    """, (filename, image_data, bytes(embedding), datetime.now().isoformat(), temperature_tag))
     image_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -68,10 +70,10 @@ def get_all_images(category):
     table = "tops" if category == "top" else "bottoms"
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute(f"SELECT id, filename, uploaded_at FROM {table}")
+    cursor.execute(f"SELECT id, filename, uploaded_at, temperature_tag FROM {table}")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "filename": r[1], "uploaded_at": r[2]} for r in rows]
+    return [{"id": r[0], "filename": r[1], "uploaded_at": r[2], "temperature_tag": r[3]} for r in rows]
 
 
 def get_image_by_id(image_id, category):
@@ -113,6 +115,16 @@ def delete_image(image_id, category):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute(f"DELETE FROM {table} WHERE id = ?", (image_id,))
+    conn.commit()
+    conn.close()
+
+
+def update_temperature_tag(image_id, category, temperature_tag):
+    """Update temperature tag for an existing image"""
+    table = "tops" if category == "top" else "bottoms"
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(f"UPDATE {table} SET temperature_tag = ? WHERE id = ?", (temperature_tag, image_id))
     conn.commit()
     conn.close()
 
