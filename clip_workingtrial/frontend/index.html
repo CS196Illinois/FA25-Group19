@@ -115,7 +115,23 @@
             <span class="close-modal" id="closeFindOutfit">&times;</span>
             <h2 style="text-align: center; margin-bottom: 20px;">Find Outfit From Your Item</h2>
             <div style="padding: 20px;">
-                <p style="margin-bottom: 15px;">Upload a clothing item to find a matching complete outfit:</p>
+                <p style="margin-bottom: 15px;">Find a matching complete outfit from your item:</p>
+
+                <!-- Selection Mode -->
+                <div style="margin-bottom: 20px; border: 2px solid #007bff; border-radius: 8px; padding: 15px; background-color: #f8f9fa;">
+                    <label style="font-weight: bold; margin-bottom: 10px; display: block;">Choose Source:</label>
+                    <div style="display: flex; gap: 20px;">
+                        <label style="cursor: pointer;">
+                            <input type="radio" name="findOutfitMode" value="upload" checked style="margin-right: 5px;">
+                            Upload from Computer
+                        </label>
+                        <label style="cursor: pointer;">
+                            <input type="radio" name="findOutfitMode" value="closet" style="margin-right: 5px;">
+                            Select from Closet
+                        </label>
+                    </div>
+                </div>
+
                 <div style="margin-bottom: 15px;">
                     <label>Select Category:</label><br>
                     <select id="findOutfitCategory" style="padding: 8px; margin-top: 5px; width: 100%; font-size: 16px;">
@@ -123,11 +139,24 @@
                         <option value="bottom">Bottom</option>
                     </select>
                 </div>
-                <div style="margin-bottom: 15px;">
-                    <label>Upload Image:</label><br>
-                    <input type="file" id="findOutfitFileInput" accept="image/*" style="margin-top: 5px;">
+
+                <!-- Upload Mode Section -->
+                <div id="uploadModeSection">
+                    <div style="margin-bottom: 15px;">
+                        <label>Upload Image:</label><br>
+                        <input type="file" id="findOutfitFileInput" accept="image/*" style="margin-top: 5px;">
+                    </div>
+                    <div id="findOutfitPreview" style="margin-bottom: 15px; text-align: center;"></div>
                 </div>
-                <div id="findOutfitPreview" style="margin-bottom: 15px; text-align: center;"></div>
+
+                <!-- Closet Mode Section -->
+                <div id="closetModeSection" style="display: none;">
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-weight: bold;">Select from Your Closet:</label>
+                        <div id="findOutfitClosetGrid" class="wardrobe-grid" style="margin-top: 10px; max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 5px;"></div>
+                    </div>
+                </div>
+
                 <button id="findOutfitSearchBtn" style="width: 100%; padding: 12px; font-size: 16px;">Search for Matching Outfit</button>
             </div>
         </div>
@@ -434,8 +463,26 @@
         // Close find outfit modal when X is clicked
         closeFindOutfit.onclick = function() {
             findOutfitModal.style.display = 'none';
+            resetFindOutfitModal();
+        }
+
+        // Function to reset find outfit modal
+        function resetFindOutfitModal() {
+            // Reset to upload mode
+            document.querySelector('input[name="findOutfitMode"][value="upload"]').checked = true;
+            document.getElementById('uploadModeSection').style.display = 'block';
+            document.getElementById('closetModeSection').style.display = 'none';
+
+            // Clear upload section
             document.getElementById('findOutfitFileInput').value = '';
             document.getElementById('findOutfitPreview').innerHTML = '';
+
+            // Clear closet section
+            document.getElementById('findOutfitClosetGrid').innerHTML = '';
+            selectedClosetItem = null;
+
+            // Note: We don't clear uploadedItemData here because it's still needed
+            // for displaying in the found outfit modal after a successful search
         }
 
         // Close found outfit modal when X is clicked
@@ -454,8 +501,7 @@
             }
             if (event.target === findOutfitModal) {
                 findOutfitModal.style.display = 'none';
-                document.getElementById('findOutfitFileInput').value = '';
-                document.getElementById('findOutfitPreview').innerHTML = '';
+                resetFindOutfitModal();
             }
             if (event.target === foundOutfitModal) {
                 foundOutfitModal.style.display = 'none';
@@ -543,6 +589,10 @@
         let selectedItemData = null;
         let selectedCategory = null;
         let oppositeCategory = null;
+        let shownOutfitIds = new Set(); // Track IDs of outfits already shown
+
+        // Blank placeholder image (1x1 gray pixel)
+        const blankImageData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
         // Function to display current outfit
         function displayCurrentOutfit() {
@@ -550,11 +600,29 @@
                 return;
             }
 
-            const currentSuggestion = outfitSuggestions[currentOutfitIndex];
+            // Find next unique outfit
+            let currentSuggestion = null;
+            let foundUnique = false;
+
+            while (currentOutfitIndex < outfitSuggestions.length) {
+                currentSuggestion = outfitSuggestions[currentOutfitIndex];
+
+                // Check if this outfit has already been shown
+                if (!shownOutfitIds.has(currentSuggestion.id)) {
+                    shownOutfitIds.add(currentSuggestion.id);
+                    foundUnique = true;
+                    break;
+                }
+
+                // Skip this duplicate and move to next
+                currentOutfitIndex++;
+            }
+
+            const totalShown = shownOutfitIds.size;
             const totalOutfits = outfitSuggestions.length;
 
             // Update counter
-            document.getElementById('outfitCounter').textContent = `Outfit ${currentOutfitIndex + 1} of ${totalOutfits}`;
+            document.getElementById('outfitCounter').textContent = `Outfit ${totalShown} (${totalOutfits} total suggestions)`;
 
             // Display images based on selected category
             if (selectedCategory === 'top') {
@@ -562,12 +630,24 @@
                 document.getElementById('outfitTopImg').src = `http://127.0.0.1:8000/get-image/top/${selectedItemData.id}`;
                 document.getElementById('outfitTopName').textContent = selectedItemData.filename;
 
-                document.getElementById('outfitBottomImg').src = `http://127.0.0.1:8000/get-image/bottom/${currentSuggestion.id}`;
-                document.getElementById('outfitBottomName').textContent = currentSuggestion.filename;
+                if (foundUnique) {
+                    document.getElementById('outfitBottomImg').src = `http://127.0.0.1:8000/get-image/bottom/${currentSuggestion.id}`;
+                    document.getElementById('outfitBottomName').textContent = currentSuggestion.filename;
+                } else {
+                    // No more unique outfits, show blank
+                    document.getElementById('outfitBottomImg').src = blankImageData;
+                    document.getElementById('outfitBottomName').textContent = 'No more unique bottoms available';
+                }
             } else {
                 // Selected a bottom, showing different tops
-                document.getElementById('outfitTopImg').src = `http://127.0.0.1:8000/get-image/top/${currentSuggestion.id}`;
-                document.getElementById('outfitTopName').textContent = currentSuggestion.filename;
+                if (foundUnique) {
+                    document.getElementById('outfitTopImg').src = `http://127.0.0.1:8000/get-image/top/${currentSuggestion.id}`;
+                    document.getElementById('outfitTopName').textContent = currentSuggestion.filename;
+                } else {
+                    // No more unique outfits, show blank
+                    document.getElementById('outfitTopImg').src = blankImageData;
+                    document.getElementById('outfitTopName').textContent = 'No more unique tops available';
+                }
 
                 document.getElementById('outfitBottomImg').src = `http://127.0.0.1:8000/get-image/bottom/${selectedItemData.id}`;
                 document.getElementById('outfitBottomName').textContent = selectedItemData.filename;
@@ -575,7 +655,7 @@
 
             // Show/hide Next button and update text
             const nextBtn = document.getElementById('nextOutfitBtn');
-            if (currentOutfitIndex >= totalOutfits - 1) {
+            if (!foundUnique || currentOutfitIndex >= totalOutfits - 1) {
                 nextBtn.textContent = 'No more outfit suggestions!';
                 nextBtn.disabled = true;
                 nextBtn.style.opacity = '0.5';
@@ -590,10 +670,8 @@
 
         // Next outfit button handler
         document.getElementById('nextOutfitBtn').addEventListener('click', () => {
-            if (currentOutfitIndex < outfitSuggestions.length - 1) {
-                currentOutfitIndex++;
-                displayCurrentOutfit();
-            }
+            currentOutfitIndex++;
+            displayCurrentOutfit();
         });
 
         // Confirm wardrobe selection and generate outfit
@@ -626,6 +704,7 @@
                 selectedCategory = result.selected_category;
                 oppositeCategory = result.opposite_category;
                 currentOutfitIndex = 0;
+                shownOutfitIds.clear(); // Reset shown outfits for new generation
 
                 // Close wardrobe modal
                 wardrobeModal.style.display = 'none';
@@ -721,6 +800,94 @@
 
         // Store uploaded item data for display
         let uploadedItemData = null;
+        let selectedClosetItem = null; // {id: number, category: 'top'|'bottom', filename: string}
+
+        // Handle mode switching
+        document.querySelectorAll('input[name="findOutfitMode"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const mode = e.target.value;
+                if (mode === 'upload') {
+                    document.getElementById('uploadModeSection').style.display = 'block';
+                    document.getElementById('closetModeSection').style.display = 'none';
+                    selectedClosetItem = null;
+                } else {
+                    document.getElementById('uploadModeSection').style.display = 'none';
+                    document.getElementById('closetModeSection').style.display = 'block';
+                    loadFindOutfitClosetItems();
+                }
+            });
+        });
+
+        // Handle category change - reload closet items if in closet mode
+        document.getElementById('findOutfitCategory').addEventListener('change', () => {
+            const mode = document.querySelector('input[name="findOutfitMode"]:checked').value;
+            if (mode === 'closet') {
+                selectedClosetItem = null; // Clear selection when category changes
+                loadFindOutfitClosetItems();
+            }
+        });
+
+        // Load closet items for find outfit modal
+        async function loadFindOutfitClosetItems() {
+            const category = document.getElementById('findOutfitCategory').value;
+            const grid = document.getElementById('findOutfitClosetGrid');
+            grid.innerHTML = '<p style="text-align: center; color: #666;">Loading...</p>';
+
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/get-images/${category}`);
+                const items = await response.json();
+
+                grid.innerHTML = '';
+
+                if (items.length === 0) {
+                    grid.innerHTML = '<p style="text-align: center; color: #666;">No items in your closet for this category.</p>';
+                    return;
+                }
+
+                items.forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'wardrobe-item';
+                    itemDiv.dataset.id = item.id;
+                    itemDiv.dataset.category = category;
+
+                    const img = document.createElement('img');
+                    img.src = `http://127.0.0.1:8000/get-image/${category}/${item.id}`;
+                    img.alt = item.filename;
+
+                    const name = document.createElement('div');
+                    name.className = 'item-name';
+                    name.textContent = item.filename;
+
+                    itemDiv.appendChild(img);
+                    itemDiv.appendChild(name);
+
+                    // Click handler for selection
+                    itemDiv.addEventListener('click', () => {
+                        // Deselect all items
+                        document.querySelectorAll('#findOutfitClosetGrid .wardrobe-item').forEach(el => {
+                            el.classList.remove('selected');
+                        });
+
+                        // Select this item
+                        itemDiv.classList.add('selected');
+                        selectedClosetItem = {
+                            id: item.id,
+                            category: category,
+                            filename: item.filename
+                        };
+
+                        // Store the image data for display later
+                        uploadedItemData = img.src;
+                    });
+
+                    grid.appendChild(itemDiv);
+                });
+
+            } catch (error) {
+                console.error('Error loading closet items:', error);
+                grid.innerHTML = '<p style="text-align: center; color: red;">Failed to load closet items.</p>';
+            }
+        }
 
         // Handle file selection for find outfit - store preview data
         document.getElementById('findOutfitFileInput').addEventListener('change', (e) => {
@@ -741,6 +908,7 @@
         let foundOutfitSuggestions = [];
         let currentFoundOutfitIndex = 0;
         let foundOutfitData = null;
+        let shownFoundOutfitIds = new Set(); // Track IDs of found outfits already shown
 
         // Function to display current found outfit
         function displayCurrentFoundOutfit() {
@@ -748,16 +916,30 @@
                 return;
             }
 
-            const currentSuggestion = foundOutfitSuggestions[currentFoundOutfitIndex];
-            const totalOutfits = foundOutfitSuggestions.length;
+            // Find next unique outfit
+            let currentSuggestion = null;
+            let foundUnique = false;
 
-            // Calculate which outfit group we're in (1-5)
-            const outfitGroup = Math.floor(currentFoundOutfitIndex / 3) + 1;
-            const variationInGroup = (currentFoundOutfitIndex % 3) + 1;
+            while (currentFoundOutfitIndex < foundOutfitSuggestions.length) {
+                currentSuggestion = foundOutfitSuggestions[currentFoundOutfitIndex];
+
+                // Check if this outfit has already been shown
+                if (!shownFoundOutfitIds.has(currentSuggestion.id)) {
+                    shownFoundOutfitIds.add(currentSuggestion.id);
+                    foundUnique = true;
+                    break;
+                }
+
+                // Skip this duplicate and move to next
+                currentFoundOutfitIndex++;
+            }
+
+            const totalShown = shownFoundOutfitIds.size;
+            const totalOutfits = foundOutfitSuggestions.length;
 
             // Update counter
             document.getElementById('foundOutfitCounter').textContent =
-                `Outfit ${currentFoundOutfitIndex + 1} of ${totalOutfits} (Reference Outfit ${outfitGroup}, Match ${variationInGroup}/3)`;
+                `Outfit ${totalShown} (${totalOutfits} total suggestions)`;
 
             // Show uploaded item
             document.getElementById('uploadedItemImg').src = uploadedItemData;
@@ -765,20 +947,30 @@
                 `Your ${foundOutfitData.uploaded_item_category.charAt(0).toUpperCase() + foundOutfitData.uploaded_item_category.slice(1)}`;
 
             // Show recommended item from closet
-            document.getElementById('recommendedItemImg').src =
-                `http://127.0.0.1:8000/get-image/${foundOutfitData.opposite_category}/${currentSuggestion.id}`;
-            document.getElementById('recommendedItemName').textContent = currentSuggestion.filename;
-            document.getElementById('recommendedItemSimilarity').textContent =
-                `Match Score: ${(currentSuggestion.similarity_to_outfit * 100).toFixed(1)}%`;
+            if (foundUnique) {
+                document.getElementById('recommendedItemImg').src =
+                    `http://127.0.0.1:8000/get-image/${foundOutfitData.opposite_category}/${currentSuggestion.id}`;
+                document.getElementById('recommendedItemName').textContent = currentSuggestion.filename;
+                document.getElementById('recommendedItemSimilarity').textContent =
+                    `Match Score: ${(currentSuggestion.similarity_to_outfit * 100).toFixed(1)}%`;
 
-            // Update View Reference Outfit button to show current reference outfit
-            document.getElementById('viewReferenceOutfitBtn').onclick = () => {
-                window.open(`http://127.0.0.1:8000/get-outfit/${currentSuggestion.reference_outfit_id}`, '_blank');
-            };
+                // Update View Reference Outfit button to show current reference outfit
+                document.getElementById('viewReferenceOutfitBtn').onclick = () => {
+                    window.open(`http://127.0.0.1:8000/get-outfit/${currentSuggestion.reference_outfit_id}`, '_blank');
+                };
+                document.getElementById('viewReferenceOutfitBtn').style.display = 'inline-block';
+            } else {
+                // No more unique outfits, show blank
+                document.getElementById('recommendedItemImg').src = blankImageData;
+                document.getElementById('recommendedItemName').textContent =
+                    `No more unique ${foundOutfitData.opposite_category}s available`;
+                document.getElementById('recommendedItemSimilarity').textContent = '';
+                document.getElementById('viewReferenceOutfitBtn').style.display = 'none';
+            }
 
             // Show/hide Next button and update text
             const nextBtn = document.getElementById('nextFoundOutfitBtn');
-            if (currentFoundOutfitIndex >= totalOutfits - 1) {
+            if (!foundUnique || currentFoundOutfitIndex >= totalOutfits - 1) {
                 nextBtn.textContent = 'No more outfit suggestions!';
                 nextBtn.disabled = true;
                 nextBtn.style.opacity = '0.5';
@@ -793,22 +985,42 @@
 
         // Next found outfit button handler
         document.getElementById('nextFoundOutfitBtn').addEventListener('click', () => {
-            if (currentFoundOutfitIndex < foundOutfitSuggestions.length - 1) {
-                currentFoundOutfitIndex++;
-                displayCurrentFoundOutfit();
-            }
+            currentFoundOutfitIndex++;
+            displayCurrentFoundOutfit();
         });
 
         document.getElementById('findOutfitSearchBtn').addEventListener('click', async () => {
-            const fileInput = document.getElementById('findOutfitFileInput');
+            const mode = document.querySelector('input[name="findOutfitMode"]:checked').value;
             const category = document.getElementById('findOutfitCategory').value;
+            let file = null;
 
-            if (!fileInput.files || fileInput.files.length === 0) {
-                alert('Please select an image first');
-                return;
+            // Validate based on mode
+            if (mode === 'upload') {
+                const fileInput = document.getElementById('findOutfitFileInput');
+                if (!fileInput.files || fileInput.files.length === 0) {
+                    alert('Please select an image first');
+                    return;
+                }
+                file = fileInput.files[0];
+            } else {
+                // Closet mode
+                if (!selectedClosetItem) {
+                    alert('Please select an item from your closet');
+                    return;
+                }
+
+                // Fetch the image blob from the server and create a file
+                try {
+                    const imageResponse = await fetch(`http://127.0.0.1:8000/get-image/${selectedClosetItem.category}/${selectedClosetItem.id}`);
+                    const blob = await imageResponse.blob();
+                    file = new File([blob], selectedClosetItem.filename, { type: blob.type });
+                } catch (error) {
+                    console.error('Error fetching closet item image:', error);
+                    alert('Failed to load selected item from closet');
+                    return;
+                }
             }
 
-            const file = fileInput.files[0];
             const formData = new FormData();
             formData.append('file', file);
             formData.append('category', category);
@@ -834,9 +1046,11 @@
                 foundOutfitSuggestions = result.suggestions;
                 currentFoundOutfitIndex = 0;
                 foundOutfitData = result;
+                shownFoundOutfitIds.clear(); // Reset shown outfits for new search
 
                 // Close the find outfit modal
                 findOutfitModal.style.display = 'none';
+                resetFindOutfitModal();
 
                 // Display the recommendation from user's closet
                 document.getElementById('foundOutfitMessage').textContent = result.message;
@@ -855,11 +1069,6 @@
 
                 // Show the result modal
                 foundOutfitModal.style.display = 'block';
-
-                // Reset form
-                fileInput.value = '';
-                document.getElementById('findOutfitPreview').innerHTML = '';
-                // Don't reset uploadedItemData yet - we need it for cycling
 
             } catch (error) {
                 console.error('Error finding outfit:', error);
