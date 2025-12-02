@@ -181,3 +181,12 @@ def get_all_outfit_embeddings():
     rows = cursor.fetchall()
     conn.close()
     return rows
+
+
+def delete_outfit(outfit_id):
+    """Delete an outfit by id"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM outfits WHERE id = ?", (outfit_id,))
+    conn.commit()
+    conn.close()
