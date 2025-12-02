@@ -13,7 +13,7 @@ from transformers import YolosImageProcessor, YolosForObjectDetection
 from app.database import (
     init_db, insert_image, get_all_embeddings, insert_similarity,
     get_all_images, get_image_by_id, delete_image,
-    insert_outfit, get_all_outfits, get_outfit_by_id, get_all_outfit_embeddings
+    insert_outfit, get_all_outfits, get_outfit_by_id, get_all_outfit_embeddings, delete_outfit
 )
 
 app = FastAPI()
@@ -137,7 +137,7 @@ def detect_and_embed_outfit(image_data):
     return top_embedding, bottom_embedding
 
 @app.post("/upload-image/")
-async def upload_image(file: UploadFile = File(...), category: str = Form(...)):
+async def upload_image(file: UploadFile = File(...), category: str = Form(...), skip_content_check: bool = Form(False)):
     try:
         # Validate category
         if category not in ['top', 'bottom']:
@@ -166,24 +166,26 @@ async def upload_image(file: UploadFile = File(...), category: str = Form(...)):
                 )
 
         # CHECK 2: Detect duplicate content using embedding similarity
-        similarity_threshold = 0.95
-        all_embeddings = get_all_embeddings(category)
-        for existing_id, existing_filename, existing_embedding_bytes in all_embeddings:
-            existing_embedding = torch.tensor(pickle.loads(existing_embedding_bytes))
-            similarity = F.cosine_similarity(embedding, existing_embedding).item()
+        # Skip this check if user explicitly chose to add separately
+        if not skip_content_check:
+            similarity_threshold = 0.95
+            all_embeddings = get_all_embeddings(category)
+            for existing_id, existing_filename, existing_embedding_bytes in all_embeddings:
+                existing_embedding = torch.tensor(pickle.loads(existing_embedding_bytes))
+                similarity = F.cosine_similarity(embedding, existing_embedding).item()
 
-            if similarity > similarity_threshold:
-                # Duplicate content found - return 409 Conflict with details
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "type": "content_duplicate",
-                        "message": f"This image looks identical to '{existing_filename}' ({similarity*100:.1f}% similar)",
-                        "existing_id": existing_id,
-                        "existing_filename": existing_filename,
-                        "similarity_score": round(similarity, 4)
-                    }
-                )
+                if similarity > similarity_threshold:
+                    # Duplicate content found - return 409 Conflict with details
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "type": "content_duplicate",
+                            "message": f"This image looks identical to '{existing_filename}' ({similarity*100:.1f}% similar)",
+                            "existing_id": existing_id,
+                            "existing_filename": existing_filename,
+                            "similarity_score": round(similarity, 4)
+                        }
+                    )
 
         # Both checks passed - insert image into DB with category
         image_id = insert_image(filename, image_data, embedding_bytes, category)
@@ -351,6 +353,20 @@ async def get_outfit(outfit_id: int):
         # outfit_data is a tuple: (id, outfit_image_data, top_embedding, bottom_embedding, uploaded_at)
         # Return the outfit image binary data (index 1)
         return Response(content=outfit_data[1], media_type="image/jpeg")
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/delete-outfit/{outfit_id}")
+async def delete_outfit_endpoint(outfit_id: int):
+    """
+    Delete an outfit by id from the outfits database
+    """
+    try:
+        delete_outfit(outfit_id)
+        return {"message": f"Outfit {outfit_id} deleted successfully"}
 
     except HTTPException as he:
         raise he
