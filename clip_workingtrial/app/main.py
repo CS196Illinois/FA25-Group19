@@ -89,6 +89,10 @@ def detect_and_embed_outfit(image_data):
     # Open the outfit image
     outfit_image = Image.open(BytesIO(image_data))
 
+    # Convert to RGB to ensure consistent channel format (fixes "Unable to infer channel dimension" error)
+    if outfit_image.mode != 'RGB':
+        outfit_image = outfit_image.convert('RGB')
+
     # Run YOLOS fashion detection
     inputs = fashion_processor(images=[outfit_image], return_tensors="pt")
     outputs = fashion_model(**inputs.to(device))
