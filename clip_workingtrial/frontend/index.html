@@ -130,6 +130,7 @@
 
             <div id="duplicateButtonContainer" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
                 <button id="duplicateOverwriteBtn" style="background-color: #ff6b6b; padding: 10px 20px; border: none; border-radius: 5px; color: white; cursor: pointer;">Overwrite</button>
+                <button id="duplicateAddSeparatelyBtn" style="background-color: #2196F3; padding: 10px 20px; border: none; border-radius: 5px; color: white; cursor: pointer; display: none;">Add Separately</button>
                 <button id="duplicateRenameBtn" style="background-color: #4CAF50; padding: 10px 20px; border: none; border-radius: 5px; color: white; cursor: pointer; display: none;">Rename</button>
                 <button id="duplicateCancelBtn" style="background-color: #999; padding: 10px 20px; border: none; border-radius: 5px; color: white; cursor: pointer;">Cancel</button>
             </div>
@@ -376,6 +377,7 @@
                 const existingImgEl = document.getElementById('duplicateExistingImg');
                 const newImgEl = document.getElementById('duplicateNewImg');
                 const overwriteBtn = document.getElementById('duplicateOverwriteBtn');
+                const addSeparatelyBtn = document.getElementById('duplicateAddSeparatelyBtn');
                 const renameBtn = document.getElementById('duplicateRenameBtn');
                 const cancelBtn = document.getElementById('duplicateCancelBtn');
                 const renameInputContainer = document.getElementById('renameInputContainer');
@@ -399,10 +401,16 @@
                 renameInputContainer.style.display = 'none';
                 renameInput.value = '';
 
-                // Show/hide Rename button based on duplicate type
-                // Only show Rename for filename duplicates, not for content duplicates
-                // Content duplicates (same image) means renaming won't help - still same image
-                renameBtn.style.display = (duplicateData.type === 'filename_duplicate') ? 'block' : 'none';
+                // Show/hide buttons based on duplicate type
+                if (duplicateData.type === 'filename_duplicate') {
+                    // Filename duplicate: show Overwrite and Rename
+                    addSeparatelyBtn.style.display = 'none';
+                    renameBtn.style.display = 'block';
+                } else if (duplicateData.type === 'content_duplicate') {
+                    // Content duplicate: show Overwrite and Add Separately
+                    addSeparatelyBtn.style.display = 'block';
+                    renameBtn.style.display = 'none';
+                }
 
                 // Show modal
                 modal.style.display = 'block';
@@ -424,6 +432,39 @@
                     });
                     const result = await response.json();
                     console.log('Upload after overwrite:', result);
+                    loadGallery(category);
+                    resolve();
+                };
+
+                // Handle add separately (for content duplicates)
+                addSeparatelyBtn.onclick = async () => {
+                    modal.style.display = 'none';
+                    // Rename file with timestamp to bypass filename check
+                    const timestamp = Date.now();
+                    const nameWithoutExt = newFile.name.substring(0, newFile.name.lastIndexOf('.'));
+                    const extension = newFile.name.substring(newFile.name.lastIndexOf('.'));
+                    const newFilename = `${nameWithoutExt}_${timestamp}${extension}`;
+
+                    const renamedFile = new File([newFile], newFilename, { type: newFile.type });
+
+                    const formData = new FormData();
+                    formData.append('file', renamedFile);
+                    formData.append('category', category);
+                    formData.append('skip_content_check', 'true');  // Skip content duplicate check
+
+                    const response = await fetch('http://127.0.0.1:8000/upload-image/', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        alert('Could not add separately: ' + (errorData.detail?.message || errorData.detail));
+                        return;
+                    }
+
+                    const result = await response.json();
+                    console.log('Upload after add separately:', result);
                     loadGallery(category);
                     resolve();
                 };
@@ -564,11 +605,17 @@
                     const imgElement = document.createElement('img');
                     imgElement.src = `http://127.0.0.1:8000/get-outfit/${outfit.id}`;
 
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'delete-btn';
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.onclick = () => deleteOutfit(outfit.id);
+
                     const info = document.createElement('div');
                     info.className = 'filename';
                     info.textContent = `Outfit #${outfit.id}`;
 
                     galleryItem.appendChild(imgElement);
+                    galleryItem.appendChild(deleteBtn);
                     galleryItem.appendChild(info);
                     container.appendChild(galleryItem);
                 }
@@ -592,6 +639,24 @@
                 loadGallery(category);
             } catch (error) {
                 console.error('Delete error:', error);
+            }
+        }
+
+        // Delete outfit
+        async function deleteOutfit(outfitId) {
+            if (!confirm('Are you sure you want to delete this outfit?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/delete-outfit/${outfitId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                document.getElementById('output').textContent = JSON.stringify(result, null, 2);
+                loadOutfitGallery();
+            } catch (error) {
+                console.error('Delete outfit error:', error);
             }
         }
         
