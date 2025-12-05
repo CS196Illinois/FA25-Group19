@@ -58,9 +58,6 @@
         <h2>Generate Outfits</h2>
         <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 15px;">
             <button id="generateRandomBtn">Generate Random Outfit</button>
-            <button id="generatePickedBtn">Generate Based on Picked Clothing</button>
-            <button id="generateSimilarityBtn">Generate for Me (Similarity)</button>
-            <button id="generateDatasetBtn">Generate for Me (Dataset)</button>
             <button id="findOutfitFromItemBtn" style="background-color: #4CAF50;">Find Outfit From My Item</button>
         </div>
     </div>
@@ -70,7 +67,6 @@
         <div class="modal-content">
             <span class="close-modal" id="closeModal">&times;</span>
             <h2 style="text-align: center; margin-bottom: 20px;">Your Generated Outfit</h2>
-            <p id="outfitCounter" style="text-align: center; color: #666; margin-bottom: 10px;">Outfit 1 of 15</p>
             <div class="outfit-display">
                 <div class="outfit-item">
                     <h4>Top</h4>
@@ -86,26 +82,6 @@
             <div style="text-align: center; margin-top: 20px;">
                 <button id="nextOutfitBtn" style="padding: 10px 30px; font-size: 16px; cursor: pointer;">Next</button>
             </div>
-        </div>
-    </div>
-
-    <!-- Wardrobe selection modal -->
-    <div id="wardrobeModal" class="modal">
-        <div class="wardrobe-modal-content">
-            <span class="close-modal" id="closeWardrobe">&times;</span>
-            <h2 style="text-align: center; margin-bottom: 20px;">Wardrobe</h2>
-
-            <div class="wardrobe-section">
-                <h3>Tops</h3>
-                <div id="wardrobeTopsGrid" class="wardrobe-grid"></div>
-            </div>
-
-            <div class="wardrobe-section">
-                <h3>Bottoms</h3>
-                <div id="wardrobeBottomsGrid" class="wardrobe-grid"></div>
-            </div>
-
-            <button id="wardrobeConfirmBtn" class="wardrobe-confirm-btn" disabled>Confirm</button>
         </div>
     </div>
 
@@ -226,7 +202,7 @@
                     <p id="confidenceMessage" style="margin: 5px 0 0 0;"></p>
                 </div>
 
-                <div style="text-align: center; margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+                <div style="text-align: center; margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
                     <button id="viewReferenceOutfitBtn" style="padding: 10px 20px; font-size: 14px; background-color: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">
                         View Reference Outfit
                     </button>
@@ -240,7 +216,6 @@
         let topsFiles = [];
         let bottomsFiles = [];
         let outfitsFiles = [];
-        let selectedItem = null; // {id: number, category: 'top'|'bottom'}
 
         // Handle tops file selection
         document.getElementById('topsInput').addEventListener('change', (e) => {
@@ -675,8 +650,6 @@
         // Modal functionality
         const modal = document.getElementById('outfitModal');
         const closeModal = document.getElementById('closeModal');
-        const wardrobeModal = document.getElementById('wardrobeModal');
-        const closeWardrobe = document.getElementById('closeWardrobe');
         const findOutfitModal = document.getElementById('findOutfitModal');
         const closeFindOutfit = document.getElementById('closeFindOutfit');
         const foundOutfitModal = document.getElementById('foundOutfitModal');
@@ -685,12 +658,6 @@
         // Close outfit modal when X is clicked
         closeModal.onclick = function() {
             modal.style.display = 'none';
-        }
-
-        // Close wardrobe modal when X is clicked
-        closeWardrobe.onclick = function() {
-            wardrobeModal.style.display = 'none';
-            selectedItem = null;
         }
 
         // Close find outfit modal when X is clicked
@@ -728,10 +695,6 @@
             if (event.target === modal) {
                 modal.style.display = 'none';
             }
-            if (event.target === wardrobeModal) {
-                wardrobeModal.style.display = 'none';
-                selectedItem = null;
-            }
             if (event.target === findOutfitModal) {
                 findOutfitModal.style.display = 'none';
                 resetFindOutfitModal();
@@ -741,235 +704,43 @@
             }
         }
 
-        // Load wardrobe items into modal
-        async function loadWardrobeModal() {
-            try {
-                // Fetch tops and bottoms
-                const topsResponse = await fetch('http://127.0.0.1:8000/get-images/top');
-                const bottomsResponse = await fetch('http://127.0.0.1:8000/get-images/bottom');
-                
-                const tops = await topsResponse.json();
-                const bottoms = await bottomsResponse.json();
-                
-                // Populate tops grid
-                const topsGrid = document.getElementById('wardrobeTopsGrid');
-                topsGrid.innerHTML = '';
-                tops.forEach(top => {
-                    const item = createWardrobeItem(top, 'top');
-                    topsGrid.appendChild(item);
-                });
-                
-                // Populate bottoms grid
-                const bottomsGrid = document.getElementById('wardrobeBottomsGrid');
-                bottomsGrid.innerHTML = '';
-                bottoms.forEach(bottom => {
-                    const item = createWardrobeItem(bottom, 'bottom');
-                    bottomsGrid.appendChild(item);
-                });
-                
-                // Show modal
-                wardrobeModal.style.display = 'block';
-                
-            } catch (error) {
-                console.error('Error loading wardrobe:', error);
-                alert('Failed to load wardrobe items');
-            }
-        }
-
-        // Create wardrobe item element
-        function createWardrobeItem(itemData, category) {
-            const item = document.createElement('div');
-            item.className = 'wardrobe-item';
-            item.dataset.id = itemData.id;
-            item.dataset.category = category;
-            
-            const img = document.createElement('img');
-            img.src = `http://127.0.0.1:8000/get-image/${category}/${itemData.id}`;
-            img.alt = itemData.filename;
-            
-            const name = document.createElement('div');
-            name.className = 'item-name';
-            name.textContent = itemData.filename;
-            
-            item.appendChild(img);
-            item.appendChild(name);
-            
-            // Click handler for selection
-            item.addEventListener('click', () => {
-                // Deselect all items
-                document.querySelectorAll('.wardrobe-item').forEach(el => {
-                    el.classList.remove('selected');
-                });
-                
-                // Select this item
-                item.classList.add('selected');
-                selectedItem = {
-                    id: itemData.id,
-                    category: category,
-                    filename: itemData.filename
-                };
-                
-                // Enable confirm button
-                document.getElementById('wardrobeConfirmBtn').disabled = false;
-            });
-            
-            return item;
-        }
-
-        // Variables for outfit cycling
-        let outfitSuggestions = [];
-        let currentOutfitIndex = 0;
-        let selectedItemData = null;
-        let selectedCategory = null;
-        let oppositeCategory = null;
-        let shownOutfitIds = new Set(); // Track IDs of outfits already shown
+        // Variables for random outfit tracking
+        let shownRandomOutfits = new Set(); // Track shown random outfit combinations
 
         // Blank placeholder image (1x1 gray pixel)
         const blankImageData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
-        // Function to display current outfit
-        function displayCurrentOutfit() {
-            if (!outfitSuggestions || outfitSuggestions.length === 0) {
-                return;
-            }
-
-            // Find next unique outfit
-            let currentSuggestion = null;
-            let foundUnique = false;
-
-            while (currentOutfitIndex < outfitSuggestions.length) {
-                currentSuggestion = outfitSuggestions[currentOutfitIndex];
-
-                // Check if this outfit has already been shown
-                if (!shownOutfitIds.has(currentSuggestion.id)) {
-                    shownOutfitIds.add(currentSuggestion.id);
-                    foundUnique = true;
-                    break;
-                }
-
-                // Skip this duplicate and move to next
-                currentOutfitIndex++;
-            }
-
-            const totalShown = shownOutfitIds.size;
-            const totalOutfits = outfitSuggestions.length;
-
-            // Update counter
-            document.getElementById('outfitCounter').textContent = `Outfit ${totalShown} (${totalOutfits} total suggestions)`;
-
-            // Display images based on selected category
-            if (selectedCategory === 'top') {
-                // Selected a top, showing different bottoms
-                document.getElementById('outfitTopImg').src = `http://127.0.0.1:8000/get-image/top/${selectedItemData.id}`;
-                document.getElementById('outfitTopName').textContent = selectedItemData.filename;
-
-                if (foundUnique) {
-                    document.getElementById('outfitBottomImg').src = `http://127.0.0.1:8000/get-image/bottom/${currentSuggestion.id}`;
-                    document.getElementById('outfitBottomName').textContent = currentSuggestion.filename;
-                } else {
-                    // No more unique outfits, show blank
-                    document.getElementById('outfitBottomImg').src = blankImageData;
-                    document.getElementById('outfitBottomName').textContent = 'No more unique bottoms available';
-                }
-            } else {
-                // Selected a bottom, showing different tops
-                if (foundUnique) {
-                    document.getElementById('outfitTopImg').src = `http://127.0.0.1:8000/get-image/top/${currentSuggestion.id}`;
-                    document.getElementById('outfitTopName').textContent = currentSuggestion.filename;
-                } else {
-                    // No more unique outfits, show blank
-                    document.getElementById('outfitTopImg').src = blankImageData;
-                    document.getElementById('outfitTopName').textContent = 'No more unique tops available';
-                }
-
-                document.getElementById('outfitBottomImg').src = `http://127.0.0.1:8000/get-image/bottom/${selectedItemData.id}`;
-                document.getElementById('outfitBottomName').textContent = selectedItemData.filename;
-            }
-
-            // Show/hide Next button and update text
-            const nextBtn = document.getElementById('nextOutfitBtn');
-            if (!foundUnique || currentOutfitIndex >= totalOutfits - 1) {
-                nextBtn.textContent = 'No more outfit suggestions!';
-                nextBtn.disabled = true;
-                nextBtn.style.opacity = '0.5';
-                nextBtn.style.cursor = 'not-allowed';
-            } else {
-                nextBtn.textContent = 'Next';
-                nextBtn.disabled = false;
-                nextBtn.style.opacity = '1';
-                nextBtn.style.cursor = 'pointer';
-            }
-        }
-
-        // Next outfit button handler
-        document.getElementById('nextOutfitBtn').addEventListener('click', () => {
-            currentOutfitIndex++;
-            displayCurrentOutfit();
+        // Next outfit button handler - generates a new random outfit
+        document.getElementById('nextOutfitBtn').addEventListener('click', async () => {
+            await generateRandomOutfit();
         });
 
-        // Confirm wardrobe selection and generate outfit
-        document.getElementById('wardrobeConfirmBtn').addEventListener('click', async () => {
-            if (!selectedItem) return;
-
-            try {
-                const response = await fetch('http://127.0.0.1:8000/generate-picked-outfit/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        item_id: selectedItem.id,
-                        item_category: selectedItem.category
-                    })
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    alert(error.detail || 'Failed to generate outfit');
-                    return;
-                }
-
-                const result = await response.json();
-
-                // Store outfit data
-                outfitSuggestions = result.suggestions;
-                selectedItemData = result.selected_item;
-                selectedCategory = result.selected_category;
-                oppositeCategory = result.opposite_category;
-                currentOutfitIndex = 0;
-                shownOutfitIds.clear(); // Reset shown outfits for new generation
-
-                // Close wardrobe modal
-                wardrobeModal.style.display = 'none';
-
-                // Display first outfit
-                displayCurrentOutfit();
-
-                // Show outfit modal
-                modal.style.display = 'block';
-
-                // Reset selection
-                selectedItem = null;
-                document.getElementById('wardrobeConfirmBtn').disabled = true;
-
-            } catch (error) {
-                console.error('Error generating outfit:', error);
-                alert('Failed to generate outfit');
-            }
-        });
-
-        // Generate Random Outfit
-        document.getElementById('generateRandomBtn').addEventListener('click', async () => {
+        // Function to generate and display a random outfit
+        async function generateRandomOutfit() {
             try {
                 const response = await fetch('http://127.0.0.1:8000/generate-random-outfit/');
 
                 if (!response.ok) {
                     const error = await response.json();
                     alert(error.detail || 'Failed to generate outfit');
-                    return;
+                    return null;
                 }
 
                 const outfit = await response.json();
+
+                // Create a unique key for this outfit combination
+                const outfitKey = `${outfit.top.id}-${outfit.bottom.id}`;
+
+                // Check if this combination has already been shown
+                if (shownRandomOutfits.has(outfitKey)) {
+                    // Try again if we haven't shown too many
+                    if (shownRandomOutfits.size < 20) { // Limit retries
+                        return await generateRandomOutfit();
+                    }
+                }
+
+                // Add to shown outfits
+                shownRandomOutfits.add(outfitKey);
 
                 // Set the images and filenames
                 document.getElementById('outfitTopImg').src = `http://127.0.0.1:8000/get-image/top/${outfit.top.id}`;
@@ -978,53 +749,26 @@
                 document.getElementById('outfitBottomImg').src = `http://127.0.0.1:8000/get-image/bottom/${outfit.bottom.id}`;
                 document.getElementById('outfitBottomName').textContent = outfit.bottom.filename;
 
-                // Show the modal
-                modal.style.display = 'block';
+                return outfit;
 
             } catch (error) {
                 console.error('Error generating random outfit:', error);
                 alert('An error occurred while generating the outfit. Please try again.');
+                return null;
             }
-        });
-        
-        // Generate Based on Picked Clothing
-        document.getElementById('generatePickedBtn').addEventListener('click', () => {
-            loadWardrobeModal();
-        });
-        
-        // Generate Similarity-Based Outfit
-        document.getElementById('generateSimilarityBtn').addEventListener('click', async () => {
-            try {
-                const response = await fetch('http://127.0.0.1:8000/generate-similarity-outfit/');
+        }
 
-                if (!response.ok) {
-                    const error = await response.json();
-                    alert(error.detail || 'Failed to generate outfit');
-                    return;
-                }
+        // Generate Random Outfit button handler
+        document.getElementById('generateRandomBtn').addEventListener('click', async () => {
+            shownRandomOutfits.clear(); // Reset for new session
 
-                const outfit = await response.json();
-
-                // Set the images and filenames
-                document.getElementById('outfitTopImg').src = `http://127.0.0.1:8000/get-image/top/${outfit.top.id}`;
-                document.getElementById('outfitTopName').textContent = outfit.top.filename;
-
-                document.getElementById('outfitBottomImg').src = `http://127.0.0.1:8000/get-image/bottom/${outfit.bottom.id}`;
-                document.getElementById('outfitBottomName').textContent = `${outfit.bottom.filename} (Similarity: ${(outfit.similarity_score * 100).toFixed(1)}%)`;
-
+            const outfit = await generateRandomOutfit();
+            if (outfit) {
                 // Show the modal
                 modal.style.display = 'block';
-
-            } catch (error) {
-                console.error('Error generating similarity-based outfit:', error);
-                alert('An error occurred while generating the outfit. Please try again.');
             }
         });
         
-        document.getElementById('generateDatasetBtn').addEventListener('click', () => {
-            console.log('Generate for Me (Dataset) clicked');
-            // TODO: Add dataset-based outfit generation functionality
-        });
 
         // Find Outfit From Item button
         document.getElementById('findOutfitFromItemBtn').addEventListener('click', () => {
