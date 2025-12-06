@@ -12,7 +12,7 @@ from transformers import YolosImageProcessor, YolosForObjectDetection
 
 from app.database import (
     init_db, insert_image, get_all_embeddings, insert_similarity,
-    get_all_images, get_image_by_id, delete_image,
+    get_all_images, get_image_by_id, delete_image, rename_image,
     insert_outfit, get_all_outfits, get_outfit_by_id, get_all_outfit_embeddings, delete_outfit
 )
 
@@ -594,6 +594,50 @@ async def generate_random_outfit():
             }
         }
 
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/rename-image/{category}/{image_id}")
+async def rename_image_endpoint(category: str, image_id: int, payload: dict):
+    """
+    Rename an image in the specified category
+
+    Args:
+        category: 'top', 'bottom', or 'outfit'
+        image_id: ID of the image to rename
+        payload: JSON with 'new_filename' field
+
+    Returns:
+        Success message with new filename
+    """
+    try:
+        # Validate category
+        if category not in ['top', 'bottom', 'outfit']:
+            raise HTTPException(status_code=400, detail="Category must be 'top', 'bottom', or 'outfit'")
+
+        # Get new filename from payload
+        new_filename = payload.get('new_filename')
+        if not new_filename:
+            raise HTTPException(status_code=400, detail="new_filename is required")
+
+        # Outfits don't have filenames, so reject rename requests for outfits
+        if category == 'outfit':
+            raise HTTPException(status_code=400, detail="Outfits cannot be renamed (they don't have filenames)")
+
+        # Rename the image
+        rename_image(image_id, new_filename, category)
+
+        return {
+            "message": f"Image renamed successfully",
+            "id": image_id,
+            "new_filename": new_filename,
+            "category": category
+        }
+
+    except ValueError as ve:
+        raise HTTPException(status_code=409, detail=str(ve))
     except HTTPException as he:
         raise he
     except Exception as e:

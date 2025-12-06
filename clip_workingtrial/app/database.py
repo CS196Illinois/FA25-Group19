@@ -190,3 +190,21 @@ def delete_outfit(outfit_id):
     cursor.execute("DELETE FROM outfits WHERE id = ?", (outfit_id,))
     conn.commit()
     conn.close()
+
+
+def rename_image(image_id, new_filename, category):
+    """Rename an image in tops or bottoms table"""
+    table = "tops" if category == "top" else "bottoms"
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Check if new filename already exists
+    cursor.execute(f"SELECT id FROM {table} WHERE filename = ? AND id != ?", (new_filename, image_id))
+    if cursor.fetchone():
+        conn.close()
+        raise ValueError(f"Filename '{new_filename}' already exists")
+
+    # Update the filename
+    cursor.execute(f"UPDATE {table} SET filename = ? WHERE id = ?", (new_filename, image_id))
+    conn.commit()
+    conn.close()
