@@ -1,5 +1,5 @@
 1. cd ~/clip_workingtrial
-2. source venv/bin/activate
+2. source myenv/bin/activate
     - activate virtual environment
 3. uvicorn app.main:app --reload
     - run uvicorn server
