@@ -8,7 +8,6 @@ from io import BytesIO
 import torch.nn.functional as F
 import pickle
 import random
-from transformers import YolosImageProcessor, YolosForObjectDetection
 
 from app.database import (
     init_db, insert_image, get_all_embeddings, insert_similarity,
@@ -18,7 +17,7 @@ from app.database import (
 
 app = FastAPI()
 
-# Configure CORS
+# configure cors
 origins = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
@@ -34,17 +33,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize database
+# initialize database
 init_db()
 
-# Load the CLIP model
+# load clip model
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load("ViT-B/32", device=device)
-
-# Load the YOLOS fashion detection model
-fashion_model_id = 'yainage90/fashion-object-detection-yolos-tiny'
-fashion_processor = YolosImageProcessor.from_pretrained(fashion_model_id)
-fashion_model = YolosForObjectDetection.from_pretrained(fashion_model_id).to(device)
 
 def get_image_embedding(image_data):
     image = preprocess(Image.open(BytesIO(image_data))).unsqueeze(0).to(device)
@@ -55,85 +49,25 @@ def get_image_embedding(image_data):
 
 def split_and_embed_outfit(image_data):
     """
-    Split outfit image into top and bottom halves, generate embeddings for each.
-    Uses simple geometric split: top 50% = top garment, bottom 50% = bottom garment.
+    split outfit image into top and bottom halves, generate embeddings for each.
+    uses simple geometric split: top 50% = top garment, bottom 50% = bottom garment.
     """
-    # Open the outfit image
+    # open outfit image
     outfit_image = Image.open(BytesIO(image_data))
     width, height = outfit_image.size
 
-    # Crop top half (top garment region)
+    # crop top half
     top_crop = outfit_image.crop((0, 0, width, height // 2))
 
-    # Crop bottom half (bottom garment region)
+    # crop bottom half
     bottom_crop = outfit_image.crop((0, height // 2, width, height))
 
-    # Generate CLIP embeddings for each region
-    # Convert crops back to bytes for processing
+    # generate clip embeddings for each region
+    # convert crops back to bytes for processing
     top_buffer = BytesIO()
     top_crop.save(top_buffer, format='PNG')
     top_embedding = get_image_embedding(top_buffer.getvalue())
 
-    bottom_buffer = BytesIO()
-    bottom_crop.save(bottom_buffer, format='PNG')
-    bottom_embedding = get_image_embedding(bottom_buffer.getvalue())
-
-    return top_embedding, bottom_embedding
-
-def detect_and_embed_outfit(image_data):
-    """
-    Use YOLOS to detect tops and bottoms in outfit image, then generate CLIP embeddings.
-    More accurate than geometric splitting - detects actual garment regions.
-    Falls back to geometric split if detection fails.
-    """
-    # Open the outfit image
-    outfit_image = Image.open(BytesIO(image_data))
-
-    # Convert to RGB to ensure consistent channel format (fixes "Unable to infer channel dimension" error)
-    if outfit_image.mode != 'RGB':
-        outfit_image = outfit_image.convert('RGB')
-
-    # Run YOLOS fashion detection
-    inputs = fashion_processor(images=[outfit_image], return_tensors="pt")
-    outputs = fashion_model(**inputs.to(device))
-
-    # Post-process detection results
-    results = fashion_processor.post_process_object_detection(
-        outputs,
-        threshold=0.5,  # confidence threshold
-        target_sizes=torch.tensor([[outfit_image.size[1], outfit_image.size[0]]])
-    )[0]
-
-    # Find best top and bottom detections
-    best_top = None
-    best_bottom = None
-
-    for score, label, box in zip(results["scores"], results["labels"], results["boxes"]):
-        class_name = fashion_model.config.id2label[label.item()]
-        confidence = score.item()
-
-        if class_name == 'top':
-            if best_top is None or confidence > best_top['conf']:
-                best_top = {'box': box.tolist(), 'conf': confidence}
-        elif class_name == 'bottom':
-            if best_bottom is None or confidence > best_bottom['conf']:
-                best_bottom = {'box': box.tolist(), 'conf': confidence}
-
-    # If detection failed, fall back to geometric split
-    if best_top is None or best_bottom is None:
-        print("YOLOS detection failed, falling back to geometric split")
-        return split_and_embed_outfit(image_data)
-
-    # Crop detected top region
-    x1, y1, x2, y2 = [int(coord) for coord in best_top['box']]
-    top_crop = outfit_image.crop((x1, y1, x2, y2))
-    top_buffer = BytesIO()
-    top_crop.save(top_buffer, format='PNG')
-    top_embedding = get_image_embedding(top_buffer.getvalue())
-
-    # Crop detected bottom region
-    x1, y1, x2, y2 = [int(coord) for coord in best_bottom['box']]
-    bottom_crop = outfit_image.crop((x1, y1, x2, y2))
     bottom_buffer = BytesIO()
     bottom_crop.save(bottom_buffer, format='PNG')
     bottom_embedding = get_image_embedding(bottom_buffer.getvalue())
@@ -143,7 +77,7 @@ def detect_and_embed_outfit(image_data):
 @app.post("/upload-image/")
 async def upload_image(file: UploadFile = File(...), category: str = Form(...), skip_content_check: bool = Form(False)):
     try:
-        # Validate category
+        # validate category as top or bottom
         if category not in ['top', 'bottom']:
             raise HTTPException(status_code=400, detail="Category must be 'top' or 'bottom'")
 
@@ -151,14 +85,14 @@ async def upload_image(file: UploadFile = File(...), category: str = Form(...), 
         embedding = get_image_embedding(image_data)
         filename = file.filename
 
-        # Convert embedding to bytes (to store in SQLite)
+        # convert embedding to bytes (to store in sqlite)
         embedding_bytes = pickle.dumps(embedding.tolist())
 
-        # CHECK 1: Detect duplicate filename
+        # check 1: detect duplicate filename
         existing_images = get_all_images(category)
         for existing_img in existing_images:
             if existing_img["filename"] == filename:
-                # Duplicate filename found - return 409 Conflict with details
+                # if duplicate filename found, return 409 conflict with details
                 raise HTTPException(
                     status_code=409,
                     detail={
@@ -169,8 +103,8 @@ async def upload_image(file: UploadFile = File(...), category: str = Form(...), 
                     }
                 )
 
-        # CHECK 2: Detect duplicate content using embedding similarity
-        # Skip this check if user explicitly chose to add separately
+        # check 2: detect duplicate content using embedding similarity
+        # skip this if user explicitly chose to add separately
         if not skip_content_check:
             similarity_threshold = 0.95
             all_embeddings = get_all_embeddings(category)
@@ -179,7 +113,7 @@ async def upload_image(file: UploadFile = File(...), category: str = Form(...), 
                 similarity = F.cosine_similarity(embedding, existing_embedding).item()
 
                 if similarity > similarity_threshold:
-                    # Duplicate content found - return 409 Conflict with details
+                    # duplicate content found - return 409 conflict with details
                     raise HTTPException(
                         status_code=409,
                         detail={
@@ -191,18 +125,18 @@ async def upload_image(file: UploadFile = File(...), category: str = Form(...), 
                         }
                     )
 
-        # Both checks passed - insert image into DB with category
+        # both checks passed -> insert image into db with category
         image_id = insert_image(filename, image_data, embedding_bytes, category)
 
-        # Compute similarity with all existing images in the same category
+        # compute similarity with all existing images in the same category
         all_rows = get_all_embeddings(category)
         for img_id, img_name, img_embedding_bytes in all_rows:
-            if img_id == image_id:  # Skip comparing with itself
+            if img_id == image_id:  # skip comparing with itself
                 continue
             existing_embedding = torch.tensor(pickle.loads(img_embedding_bytes))
             similarity = F.cosine_similarity(embedding, existing_embedding).item()
 
-            # Store similarity based on category
+            # store similarity based on category
             if category == 'top':
                 insert_similarity(image_id, img_id, similarity)
             else:
@@ -220,39 +154,12 @@ async def upload_image(file: UploadFile = File(...), category: str = Form(...), 
     except Exception as e:
         return {"error": f"An error occurred during upload: {e}"}
 
-@app.post("/upload-outfit/")
-async def upload_outfit(file: UploadFile = File(...)):
-    """
-    Upload a complete outfit image (person wearing top + bottom).
-    Uses YOLOS to detect and crop top/bottom regions, stores as linked outfit.
-    """
-    try:
-        image_data = await file.read()
 
-        # Use YOLOS to detect and embed top and bottom
-        top_embedding, bottom_embedding = detect_and_embed_outfit(image_data)
-
-        # Convert embeddings to bytes
-        top_embedding_bytes = pickle.dumps(top_embedding.tolist())
-        bottom_embedding_bytes = pickle.dumps(bottom_embedding.tolist())
-
-        # Insert into outfits table (keeps top and bottom linked)
-        outfit_id = insert_outfit(image_data, top_embedding_bytes, bottom_embedding_bytes)
-
-        return {
-            "filename": file.filename,
-            "message": "Outfit uploaded successfully - top and bottom detected and linked",
-            "outfit_id": outfit_id
-        }
-
-    except Exception as e:
-        return {"error": f"An error occurred during outfit upload: {e}"}
-
-# Route to calculate and return similarity score
+# route to calculate and return similarity score
 @app.post("/compare-images/")
 async def compare_images(file: UploadFile = File(...), category: str = Form(...)):
     try:
-        # Validate category
+        # validate category
         if category not in ['top', 'bottom']:
             raise HTTPException(status_code=400, detail="Category must be 'top' or 'bottom'")
         
@@ -283,7 +190,7 @@ async def compare_images(file: UploadFile = File(...), category: str = Form(...)
 @app.get("/get-images/{category}")
 def get_images(category: str):
     try:
-        # Validate category
+        # validate category
         if category not in ['top', 'bottom']:
             raise HTTPException(status_code=400, detail="Category must be 'top' or 'bottom'")
         
@@ -296,10 +203,10 @@ def get_images(category: str):
 @app.get("/get-image/{category}/{image_id}")
 async def get_image(category: str, image_id: int):
     """
-    Get image data by id and return as binary image
+    get image data by id and return as binary image
     """
     try:
-        # Validate category
+        # validate category
         if category not in ['top', 'bottom']:
             raise HTTPException(status_code=400, detail="Category must be 'top' or 'bottom'")
         
@@ -308,7 +215,7 @@ async def get_image(category: str, image_id: int):
             raise HTTPException(status_code=404, detail="Image not found")
         
         # image_data is a tuple: (id, filename, image_data, embedding)
-        # Return the image binary data (index 2)
+        # return image binary data (index 2)
         return Response(content=image_data[2], media_type="image/jpeg")
     
     except HTTPException as he:
@@ -319,10 +226,10 @@ async def get_image(category: str, image_id: int):
 @app.delete("/delete-image/{category}/{image_id}")
 async def delete_image_endpoint(category: str, image_id: int):
     """
-    Delete an image by id from the specified category
+    delete an image by id from the specified category
     """
     try:
-        # Validate category
+        # validate category
         if category not in ['top', 'bottom']:
             raise HTTPException(status_code=400, detail="Category must be 'top' or 'bottom'")
 
@@ -334,39 +241,12 @@ async def delete_image_endpoint(category: str, image_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/get-outfits/")
-def get_outfits():
-    """
-    Get all complete outfits (metadata only, no image data)
-    """
-    try:
-        return get_all_outfits()
-    except Exception as e:
-        return {"error": f"Failed to fetch outfits: {e}"}
 
-@app.get("/get-outfit/{outfit_id}")
-async def get_outfit(outfit_id: int):
-    """
-    Get complete outfit image by id
-    """
-    try:
-        outfit_data = get_outfit_by_id(outfit_id)
-        if outfit_data is None:
-            raise HTTPException(status_code=404, detail="Outfit not found")
-
-        # outfit_data is a tuple: (id, outfit_image_data, top_embedding, bottom_embedding, uploaded_at)
-        # Return the outfit image binary data (index 1)
-        return Response(content=outfit_data[1], media_type="image/jpeg")
-
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/delete-outfit/{outfit_id}")
 async def delete_outfit_endpoint(outfit_id: int):
     """
-    Delete an outfit by id from the outfits database
+    delete an outfit by id from the outfits database
     """
     try:
         delete_outfit(outfit_id)
@@ -380,20 +260,20 @@ async def delete_outfit_endpoint(outfit_id: int):
 @app.post("/upload-outfit/")
 async def upload_outfit(file: UploadFile = File(...)):
     """
-    Upload a complete outfit image (photo of person wearing full outfit).
-    The image will be split into top/bottom halves and embeddings generated for each.
+    upload a complete outfit image (photo of person wearing full outfit).
+    the image will be split into top/bottom halves and embeddings generated for each.
     """
     try:
         outfit_image_data = await file.read()
 
-        # Split image and generate embeddings for top and bottom regions
+        # split image and generate embeddings for top and bottom regions
         top_embedding, bottom_embedding = split_and_embed_outfit(outfit_image_data)
 
-        # Convert embeddings to bytes for storage
+        # convert embeddings to bytes for storage
         top_embedding_bytes = pickle.dumps(top_embedding.tolist())
         bottom_embedding_bytes = pickle.dumps(bottom_embedding.tolist())
 
-        # Store outfit in database
+        # store outfit in database
         outfit_id = insert_outfit(outfit_image_data, top_embedding_bytes, bottom_embedding_bytes)
 
         return {
@@ -408,40 +288,40 @@ async def upload_outfit(file: UploadFile = File(...)):
 @app.post("/find-outfit-by-item/")
 async def find_outfit_by_item(file: UploadFile = File(...), category: str = Form(...)):
     """
-    Upload a single clothing item and get a recommendation from your closet.
+    upload a single clothing item and get a recommendation from your closet.
 
-    Workflow:
-    1. Find an outfit with similar item in the specified category
-    2. Get the opposite piece from that outfit (if you uploaded top, get outfit's bottom)
-    3. Search YOUR closet for items similar to that outfit piece
-    4. Return recommendation from your actual wardrobe
+    workflow:
+    1. find an outfit with similar item in the specified category
+    2. get the opposite piece from that outfit (if you uploaded top, get outfit's bottom)
+    3. search your closet for items similar to that outfit piece
+    4. return recommendation from your actual wardrobe
 
-    Args:
-        file: Image of a single clothing item (top or bottom)
+    args:
+        file: image of a single clothing item (top or bottom)
         category: 'top' or 'bottom' - which type of clothing item this is
 
-    Returns:
-        Recommendation with item from user's closet and confidence level
+    returns:
+        recommendation with item from user's closet and confidence level
     """
     try:
-        # Validate category
+        # validate category
         if category not in ['top', 'bottom']:
             raise HTTPException(status_code=400, detail="Category must be 'top' or 'bottom'")
 
-        # Get all outfit embeddings
+        # get all outfit embeddings
         outfit_embeddings = get_all_outfit_embeddings()
         if not outfit_embeddings:
             raise HTTPException(status_code=404, detail="No outfits in database to search")
 
-        # Generate embedding for the uploaded item
+        # generate embedding for the uploaded item
         item_image_data = await file.read()
         item_embedding = get_image_embedding(item_image_data)
 
-        # STEP 1: Find top 5 best matching outfits for uploaded item
+        # step 1: find top 5 best matching outfits for uploaded item
         outfit_matches = []
 
         for outfit_id, top_embedding_bytes, bottom_embedding_bytes in outfit_embeddings:
-            # Choose which embedding to compare based on category
+            # choose which embedding to compare based on category
             if category == 'top':
                 outfit_embedding = torch.tensor(pickle.loads(top_embedding_bytes))
                 opposite_embedding_bytes = bottom_embedding_bytes
@@ -449,7 +329,7 @@ async def find_outfit_by_item(file: UploadFile = File(...), category: str = Form
                 outfit_embedding = torch.tensor(pickle.loads(bottom_embedding_bytes))
                 opposite_embedding_bytes = top_embedding_bytes
 
-            # Compute similarity
+            # compute similarity
             similarity = F.cosine_similarity(item_embedding, outfit_embedding).item()
 
             outfit_matches.append({
@@ -458,14 +338,14 @@ async def find_outfit_by_item(file: UploadFile = File(...), category: str = Form
                 "opposite_embedding": torch.tensor(pickle.loads(opposite_embedding_bytes))
             })
 
-        # Sort by similarity descending and take top 5 outfits
+        # sort by similarity descending and take top 5 outfits
         outfit_matches.sort(key=lambda x: x["similarity"], reverse=True)
         top_5_outfits = outfit_matches[:5]
 
         if not top_5_outfits:
             raise HTTPException(status_code=404, detail="Could not find matching outfit")
 
-        # STEP 2: For each of the 5 best outfits, find 3 best matching items from closet
+        # step 2: for each of the 5 best outfits, find 3 best matching items from closet
         opposite_category = 'bottom' if category == 'top' else 'top'
         closet_items = get_all_embeddings(opposite_category)
 
@@ -478,7 +358,7 @@ async def find_outfit_by_item(file: UploadFile = File(...), category: str = Form
         all_suggestions = []
 
         for outfit_match in top_5_outfits:
-            # For this specific outfit, find best 3 closet items
+            # for this specific outfit, find best 3 closet items
             closet_matches = []
 
             for closet_item_id, closet_item_name, closet_embedding_bytes in closet_items:
@@ -492,11 +372,11 @@ async def find_outfit_by_item(file: UploadFile = File(...), category: str = Form
                     "outfit_id": outfit_match["outfit_id"]
                 })
 
-            # Sort by similarity and take top 3 for this outfit
+            # sort by similarity and take top 3 for this outfit
             closet_matches.sort(key=lambda x: x["similarity"], reverse=True)
             top_3_closet_items = closet_matches[:3]
 
-            # Add these 3 suggestions
+            # add these 3 suggestions
             for closet_item in top_3_closet_items:
                 all_suggestions.append({
                     "id": closet_item["id"],
@@ -505,7 +385,7 @@ async def find_outfit_by_item(file: UploadFile = File(...), category: str = Form
                     "reference_outfit_id": closet_item["outfit_id"]
                 })
 
-        # Determine confidence level based on best match
+        # determine confidence level based on best match
         best_similarity = all_suggestions[0]["similarity_to_outfit"] if all_suggestions else 0
         confidence = "high" if best_similarity > 0.6 else "low"
         confidence_message = ""
@@ -514,7 +394,7 @@ async def find_outfit_by_item(file: UploadFile = File(...), category: str = Form
 
         return {
             "message": f"Based on outfits with similar {category}s, here are suggestions from your closet",
-            "outfit_reference_id": top_5_outfits[0]["outfit_id"],  # First/best outfit
+            "outfit_reference_id": top_5_outfits[0]["outfit_id"],  # first/best outfit
             "outfit_similarity": top_5_outfits[0]["similarity"],
             "uploaded_item_category": category,
             "opposite_category": opposite_category,
@@ -531,7 +411,7 @@ async def find_outfit_by_item(file: UploadFile = File(...), category: str = Form
 @app.get("/get-outfits/")
 def get_outfits():
     """
-    Get list of all uploaded outfits (metadata only, no image data).
+    get list of all uploaded outfits (metadata only, no image data).
     """
     try:
         return get_all_outfits()
@@ -541,7 +421,7 @@ def get_outfits():
 @app.get("/get-outfit/{outfit_id}")
 async def get_outfit(outfit_id: int):
     """
-    Get a specific outfit image by ID and return as binary image.
+    get a specific outfit image by id and return as binary image.
     """
     try:
         outfit_data = get_outfit_by_id(outfit_id)
@@ -549,7 +429,7 @@ async def get_outfit(outfit_id: int):
             raise HTTPException(status_code=404, detail="Outfit not found")
 
         # outfit_data is tuple: (id, outfit_image_data, top_embedding, bottom_embedding, uploaded_at)
-        # Return the outfit image binary data (index 1)
+        # return the outfit image binary data (index 1)
         return Response(content=outfit_data[1], media_type="image/jpeg")
 
     except HTTPException as he:
@@ -560,14 +440,14 @@ async def get_outfit(outfit_id: int):
 @app.get("/generate-random-outfit/")
 async def generate_random_outfit():
     """
-    Generate a random outfit by selecting one random top and one random bottom
+    generate a random outfit by selecting one random top and one random bottom
     """
     try:
-        # Get all tops and bottoms
+        # get all tops and bottoms
         tops = get_all_images('top')
         bottoms = get_all_images('bottom')
 
-        # Handle edge cases
+        # handle edge cases
         if not tops and not bottoms:
             raise HTTPException(status_code=404, detail="No tops or bottoms available in the database")
 
@@ -577,7 +457,7 @@ async def generate_random_outfit():
         if not bottoms:
             raise HTTPException(status_code=404, detail="No bottoms available in the database")
 
-        # Randomly select one top and one bottom
+        # randomly select one top and one bottom
         random_top = random.choice(tops)
         random_bottom = random.choice(bottoms)
 
@@ -602,31 +482,31 @@ async def generate_random_outfit():
 @app.put("/rename-image/{category}/{image_id}")
 async def rename_image_endpoint(category: str, image_id: int, payload: dict):
     """
-    Rename an image in the specified category
+    rename an image in the specified category
 
-    Args:
+    args:
         category: 'top', 'bottom', or 'outfit'
-        image_id: ID of the image to rename
-        payload: JSON with 'new_filename' field
+        image_id: id of the image to rename
+        payload: json with 'new_filename' field
 
-    Returns:
-        Success message with new filename
+    returns:
+        success message with new filename
     """
     try:
-        # Validate category
+        # validate category
         if category not in ['top', 'bottom', 'outfit']:
             raise HTTPException(status_code=400, detail="Category must be 'top', 'bottom', or 'outfit'")
 
-        # Get new filename from payload
+        # get new filename from payload
         new_filename = payload.get('new_filename')
         if not new_filename:
             raise HTTPException(status_code=400, detail="new_filename is required")
 
-        # Outfits don't have filenames, so reject rename requests for outfits
+        # outfits don't have filenames, so reject rename requests for outfits
         if category == 'outfit':
             raise HTTPException(status_code=400, detail="Outfits cannot be renamed (they don't have filenames)")
 
-        # Rename the image
+        # rename the image
         rename_image(image_id, new_filename, category)
 
         return {

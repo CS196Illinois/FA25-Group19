@@ -5,7 +5,7 @@
     <link rel="stylesheet" type="text/css" href="style.css">
 </head>
 <body>
-    <!-- Navigation Bar -->
+    <!-- navigation bar -->
     <nav class="navbar">
         <div class="nav-brand">Fashion Recommender</div>
         <div class="nav-links">
@@ -16,13 +16,13 @@
         </div>
     </nav>
 
-    <!-- Upload Clothing Images Section -->
+    <!-- upload clothing images section -->
     <section id="upload-section" class="main-section">
         <h1 class="section-title">Upload Clothing Images</h1>
     
-        <!-- Subsections for Tops and Bottoms -->
+        <!-- subsections for tops and bottoms -->
         <div class="subsection-grid">
-            <!-- Tops Upload Subsection -->
+            <!-- tops upload subsection -->
             <div class="upload-subsection">
                 <h2 class="subsection-title">Upload Tops</h2>
                 <input type="file" id="topsInput" accept="image/*" multiple class="file-input">
@@ -30,7 +30,7 @@
                 <button id="uploadTopsBtn" style="display: none;" class="upload-btn">Upload Tops</button>
             </div>
 
-            <!-- Bottoms Upload Subsection -->
+            <!-- bottoms upload subsection -->
             <div class="upload-subsection">
                 <h2 class="subsection-title">Upload Bottoms</h2>
                 <input type="file" id="bottomsInput" accept="image/*" multiple class="file-input">
@@ -40,19 +40,19 @@
         </div>
     </section>
 
-    <!-- Wardrobe Section -->
+    <!-- wardrobe section -->
     <section id="wardrobe-section" class="main-section">
         <h1 class="section-title">Wardrobe</h1>
 
         <div class="subsection-grid">
-            <!-- Currently Uploaded Tops -->
+            <!-- currently uploaded tops -->
             <div class="wardrobe-subsection">
                 <h2 class="subsection-title">Currently Uploaded Tops</h2>
                 <button id="refreshTops" class="refresh-btn">Refresh Tops</button>
                 <div id="topsGallery" class="gallery-container"></div>
             </div>
 
-            <!-- Currently Uploaded Bottoms -->
+            <!-- currently uploaded bottoms -->
             <div class="wardrobe-subsection">
                 <h2 class="subsection-title">Currently Uploaded Bottoms</h2>
                 <button id="refreshBottoms" class="refresh-btn">Refresh Bottoms</button>
@@ -61,12 +61,12 @@
         </div>
     </section>
 
-    <!-- Style Editor Section -->
+    <!-- style editor section -->
     <section id="style-editor-section" class="main-section">
         <h1 class="section-title">Style Editor</h1>
 
         <div class="subsection-grid">
-            <!-- Upload Complete Outfits -->
+            <!-- upload complete outfits -->
             <div class="style-upload-subsection">
                 <h2 class="subsection-title">Upload Complete Outfits</h2>
                 <p class="subsection-description">Upload photos of people wearing complete outfits (top + bottom)</p>
@@ -75,7 +75,7 @@
                 <button id="uploadOutfitsBtn" style="display: none;" class="upload-btn">Upload Outfits</button>
             </div>
 
-            <!-- Current Style Inspirations -->
+            <!-- current style inspirations -->
             <div class="style-gallery-subsection">
                 <h2 class="subsection-title">Current Style Inspirations</h2>
                 <button id="refreshOutfits" class="refresh-btn">Refresh Inspirations</button>
@@ -84,7 +84,7 @@
         </div>
     </section>
 
-    <!-- Generate Outfits Section -->
+    <!-- generate outfits section -->
     <section id="generate-section" class="main-section">
         <h1 class="section-title">Generate Outfits</h1>
         <div class="generate-buttons">
@@ -95,7 +95,7 @@
 
     <pre id="output" style="display: none;"></pre>
 
-    <!-- Full Size Image Modal -->
+    <!-- full size image modal -->
     <div id="fullSizeImageModal" class="modal">
         <div class="full-size-modal-content">
             <span class="close-modal" id="closeFullSizeImage">&times;</span>
@@ -114,7 +114,7 @@
         </div>
     </div>
 
-    <!-- Modal for displaying generated outfit -->
+    <!-- modal for displaying generated outfit -->
     <div id="outfitModal" class="modal">
         <div class="modal-content">
             <span class="close-modal" id="closeModal">&times;</span>
@@ -138,7 +138,7 @@
         </div>
     </div>
 
-    <!-- Duplicate detection modal -->
+    <!-- duplicate detection modal -->
     <div id="duplicateModal" class="modal">
         <div class="modal-content" style="max-width: 800px;">
             <span class="close-modal" id="closeDuplicate">&times;</span>
@@ -171,7 +171,7 @@
         </div>
     </div>
 
-    <!-- Find Outfit From Item Modal -->
+    <!-- find outfit from item modal -->
     <div id="findOutfitModal" class="modal">
         <div class="modal-content">
             <span class="close-modal" id="closeFindOutfit">&times;</span>
@@ -179,7 +179,7 @@
             <div style="padding: 20px;">
                 <p style="margin-bottom: 15px;">Find a matching complete outfit from your item:</p>
 
-                <!-- Selection Mode -->
+                <!-- selection mode -->
                 <div style="margin-bottom: 20px; border: 2px solid #007bff; border-radius: 8px; padding: 15px; background-color: #f8f9fa;">
                     <label style="font-weight: bold; margin-bottom: 10px; display: block;">Choose Source:</label>
                     <div style="display: flex; gap: 20px;">
@@ -202,7 +202,7 @@
                     </select>
                 </div>
 
-                <!-- Upload Mode Section -->
+                <!-- upload mode section -->
                 <div id="uploadModeSection">
                     <div style="margin-bottom: 15px;">
                         <label>Upload Image:</label><br>
@@ -211,7 +211,7 @@
                     <div id="findOutfitPreview" style="margin-bottom: 15px; text-align: center;"></div>
                 </div>
 
-                <!-- Closet Mode Section -->
+                <!-- closet mode section -->
                 <div id="closetModeSection" style="display: none;">
                     <div style="margin-bottom: 15px;">
                         <label style="font-weight: bold;">Select from Your Closet:</label>
@@ -224,7 +224,7 @@
         </div>
     </div>
 
-    <!-- Found Outfit Result Modal -->
+    <!-- found outfit result modal -->
     <div id="foundOutfitModal" class="modal">
         <div class="modal-content">
             <span class="close-modal" id="closeFoundOutfit">&times;</span>
@@ -271,40 +271,40 @@
         let bottomsFiles = [];
         let outfitsFiles = [];
 
-        // Handle tops file selection
+        // handle tops file selection
         document.getElementById('topsInput').addEventListener('change', (e) => {
             const newFiles = Array.from(e.target.files);
-            // Append new files to existing ones
+            // append new files to existing ones
             topsFiles = [...topsFiles, ...newFiles];
             displayPreviews(topsFiles, 'topsPreview');
             document.getElementById('uploadTopsBtn').style.display = topsFiles.length > 0 ? 'block' : 'none';
-            // Clear the input so the same file can be selected again
+            // clear the input so the same file can be selected again
             e.target.value = '';
         });
 
-        // Handle bottoms file selection
+        // handle bottoms file selection
         document.getElementById('bottomsInput').addEventListener('change', (e) => {
             const newFiles = Array.from(e.target.files);
-            // Append new files to existing ones
+            // append new files to existing ones
             bottomsFiles = [...bottomsFiles, ...newFiles];
             displayPreviews(bottomsFiles, 'bottomsPreview');
             document.getElementById('uploadBottomsBtn').style.display = bottomsFiles.length > 0 ? 'block' : 'none';
-            // Clear the input so the same file can be selected again
+            // clear the input so the same file can be selected again
             e.target.value = '';
         });
 
-        // Handle outfits file selection
+        // handle outfits file selection
         document.getElementById('outfitsInput').addEventListener('change', (e) => {
             const newFiles = Array.from(e.target.files);
-            // Append new files to existing ones
+            // append new files to existing ones
             outfitsFiles = [...outfitsFiles, ...newFiles];
             displayPreviews(outfitsFiles, 'outfitsPreview');
             document.getElementById('uploadOutfitsBtn').style.display = outfitsFiles.length > 0 ? 'block' : 'none';
-            // Clear the input so the same file can be selected again
+            // clear the input so the same file can be selected again
             e.target.value = '';
         });
         
-        // Display image previews
+        // display image previews
         function displayPreviews(files, containerId) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
@@ -336,7 +336,7 @@
             });
         }
         
-        // Remove image from preview
+        // remove image from preview
         function removePreview(index, containerId) {
             if (containerId === 'topsPreview') {
                 topsFiles.splice(index, 1);
@@ -353,7 +353,7 @@
             }
         }
         
-        // Upload tops
+        // upload tops
         document.getElementById('uploadTopsBtn').addEventListener('click', async () => {
             await uploadImages(topsFiles, 'top');
             topsFiles = [];
@@ -363,7 +363,7 @@
             loadGallery('top');
         });
         
-        // Upload bottoms
+        // upload bottoms
         document.getElementById('uploadBottomsBtn').addEventListener('click', async () => {
             await uploadImages(bottomsFiles, 'bottom');
             bottomsFiles = [];
@@ -373,7 +373,7 @@
             loadGallery('bottom');
         });
 
-        // Upload outfits
+        // upload outfits
         document.getElementById('uploadOutfitsBtn').addEventListener('click', async () => {
             await uploadOutfits(outfitsFiles);
             outfitsFiles = [];
@@ -383,12 +383,12 @@
             loadOutfitGallery();
         });
 
-        // Upload images function
+        // upload images function
         async function uploadImages(files, category) {
             const results = [];
-            const uploadedFilenames = new Set(); // Track filenames uploaded in this batch
+            const uploadedFilenames = new Set(); // track filenames uploaded in this batch
 
-            // Get existing filenames from the database
+            // get existing filenames from the database
             const existingResponse = await fetch(`http://127.0.0.1:8000/get-images/${category}`);
             const existingImages = await existingResponse.json();
             const existingFilenames = new Set(existingImages.map(img => img.filename));
@@ -397,29 +397,29 @@
                 let currentFile = file;
                 let filename = file.name;
 
-                // Check if filename already exists (in database or current batch)
+                // check if filename already exists (in database or current batch)
                 if (existingFilenames.has(filename) || uploadedFilenames.has(filename)) {
-                    // Auto-version the filename
+                    // auto-version the filename
                     const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.'));
                     const extension = filename.substring(filename.lastIndexOf('.'));
                     let version = 1;
                     let newFilename = `${nameWithoutExt}(${version})${extension}`;
 
-                    // Keep incrementing version until we find an unused filename
+                    // keep incrementing version until we find an unused filename
                     while (existingFilenames.has(newFilename) || uploadedFilenames.has(newFilename)) {
                         version++;
                         newFilename = `${nameWithoutExt}(${version})${extension}`;
                     }
 
-                    // Create a new File object with the versioned filename
+                    // create a new file object with the versioned filename
                     currentFile = new File([file], newFilename, { type: file.type });
                     filename = newFilename;
                 }
 
-                // Add to uploaded filenames set
+                // add to uploaded filenames set
                 uploadedFilenames.add(filename);
 
-                // Upload the file
+                // upload the file
                 const formData = new FormData();
                 formData.append('file', currentFile);
                 formData.append('category', category);
@@ -439,7 +439,7 @@
                     const result = await response.json();
                     results.push(result);
 
-                    // Add to existing filenames set for next iterations
+                    // add to existing filenames set for next iterations
                     existingFilenames.add(filename);
                 } catch (error) {
                     console.error('Upload error:', error);
@@ -448,7 +448,7 @@
             document.getElementById('output').textContent = JSON.stringify(results, null, 2);
         }
 
-        // Handle duplicate detection dialog
+        // handle duplicate detection dialog
         async function handleDuplicate(newFile, duplicateData, category) {
             return new Promise((resolve) => {
                 const modal = document.getElementById('duplicateModal');
@@ -464,7 +464,7 @@
                 const confirmRenameBtn = document.getElementById('duplicateConfirmRenameBtn');
                 const closeBtn = document.getElementById('closeDuplicate');
 
-                // Clone buttons to remove all existing event listeners
+                // clone buttons to remove all existing event listeners
                 const newOverwriteBtn = overwriteBtn.cloneNode(true);
                 const newAddSeparatelyBtn = addSeparatelyBtn.cloneNode(true);
                 const newRenameBtn = renameBtn.cloneNode(true);
@@ -479,35 +479,35 @@
                 confirmRenameBtn.parentNode.replaceChild(newConfirmRenameBtn, confirmRenameBtn);
                 closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
 
-                // Display message
+                // display message
                 messageEl.textContent = duplicateData.message;
 
-                // Display new image
+                // display new image
                 const newReader = new FileReader();
                 newReader.onload = (e) => {
                     newImgEl.src = e.target.result;
                 };
                 newReader.readAsDataURL(newFile);
 
-                // Display existing image
+                // display existing image
                 existingImgEl.src = `http://127.0.0.1:8000/get-image/${category}/${duplicateData.existing_id}`;
 
-                // Reset rename input
+                // reset rename input
                 renameInputContainer.style.display = 'none';
                 renameInput.value = '';
 
-                // Show/hide buttons based on duplicate type
+                // show/hide buttons based on duplicate type
                 if (duplicateData.type === 'filename_duplicate') {
-                    // Filename duplicate: show Overwrite and Rename
+                    // filename duplicate: show overwrite and rename
                     newAddSeparatelyBtn.style.display = 'none';
                     newRenameBtn.style.display = 'block';
                 } else if (duplicateData.type === 'content_duplicate') {
-                    // Content duplicate: show Overwrite and Add Separately
+                    // content duplicate: show overwrite and add separately
                     newAddSeparatelyBtn.style.display = 'block';
                     newRenameBtn.style.display = 'none';
                 }
 
-                // Show modal
+                // show modal
                 modal.style.display = 'block';
 
                 // Handle overwrite

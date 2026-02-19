@@ -2,15 +2,15 @@ import sqlite3
 import os
 from datetime import datetime
 
-# Path to SQLite database file
+# path to sqlite database file
 DB_PATH = os.path.join(os.path.dirname(__file__), "images.db")
 
-# Create tables if not exist
+# create tables if not exist
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # Table to store top images and their embeddings
+    # table to store top images and their embeddings
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS tops (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -21,7 +21,7 @@ def init_db():
     )
     """)
 
-    # Table to store bottom images and their embeddings
+    # table to store bottom images and their embeddings
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS bottoms (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,7 +32,7 @@ def init_db():
     )
     """)
 
-    # Table to store similarity scores between pairs of images
+    # table to store similarity scores between pairs of images
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS similarities (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,7 +44,7 @@ def init_db():
     )
     """)
 
-    # Table to store complete outfits (photo of person wearing full outfit)
+    # table to store complete outfits (photo of person wearing full outfit)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS outfits (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,7 +60,7 @@ def init_db():
 
 
 def insert_image(filename, image_data, embedding, category):
-    """Insert image into tops or bottoms table based on category"""
+    """insert image into tops or bottoms table based on category"""
     table = "tops" if category == "top" else "bottoms"
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -75,7 +75,7 @@ def insert_image(filename, image_data, embedding, category):
 
 
 def get_all_images(category):
-    """Get all images from tops or bottoms table"""
+    """get all images from tops or bottoms table"""
     table = "tops" if category == "top" else "bottoms"
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -86,7 +86,7 @@ def get_all_images(category):
 
 
 def get_image_by_id(image_id, category):
-    """Get image data by id from tops or bottoms table"""
+    """get image data by id from tops or bottoms table"""
     table = "tops" if category == "top" else "bottoms"
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -96,19 +96,8 @@ def get_image_by_id(image_id, category):
     return row
 
 
-def get_image_by_filename(filename, category):
-    """Get image by filename from tops or bottoms table"""
-    table = "tops" if category == "top" else "bottoms"
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute(f"SELECT id, embedding FROM {table} WHERE filename = ?", (filename,))
-    row = cursor.fetchone()
-    conn.close()
-    return row
-
-
 def get_all_embeddings(category):
-    """Get all embeddings from tops or bottoms table"""
+    """get all embeddings from tops or bottoms table"""
     table = "tops" if category == "top" else "bottoms"
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -119,7 +108,7 @@ def get_all_embeddings(category):
 
 
 def delete_image(image_id, category):
-    """Delete image from tops or bottoms table"""
+    """delete image from tops or bottoms table"""
     table = "tops" if category == "top" else "bottoms"
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -140,7 +129,7 @@ def insert_similarity(top_id, bottom_id, similarity):
 
 
 def insert_outfit(outfit_image_data, top_embedding, bottom_embedding):
-    """Insert a complete outfit with embeddings for top and bottom regions"""
+    """insert a complete outfit with embeddings for top and bottom regions"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
@@ -154,7 +143,7 @@ def insert_outfit(outfit_image_data, top_embedding, bottom_embedding):
 
 
 def get_all_outfits():
-    """Get all outfits with metadata (no image data to keep response light)"""
+    """get all outfits with metadata (no image data to keep response light)"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT id, uploaded_at FROM outfits")
@@ -164,7 +153,7 @@ def get_all_outfits():
 
 
 def get_outfit_by_id(outfit_id):
-    """Get complete outfit data including image and embeddings"""
+    """get complete outfit data including image and embeddings"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT id, outfit_image_data, top_embedding, bottom_embedding, uploaded_at FROM outfits WHERE id = ?", (outfit_id,))
@@ -174,7 +163,7 @@ def get_outfit_by_id(outfit_id):
 
 
 def get_all_outfit_embeddings():
-    """Get all outfit embeddings for similarity search"""
+    """get all outfit embeddings for similarity search"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT id, top_embedding, bottom_embedding FROM outfits")
@@ -184,7 +173,7 @@ def get_all_outfit_embeddings():
 
 
 def delete_outfit(outfit_id):
-    """Delete an outfit by id"""
+    """delete an outfit by id"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM outfits WHERE id = ?", (outfit_id,))
@@ -193,18 +182,18 @@ def delete_outfit(outfit_id):
 
 
 def rename_image(image_id, new_filename, category):
-    """Rename an image in tops or bottoms table"""
+    """rename an image in tops or bottoms table"""
     table = "tops" if category == "top" else "bottoms"
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # Check if new filename already exists
+    # check if new filename already exists
     cursor.execute(f"SELECT id FROM {table} WHERE filename = ? AND id != ?", (new_filename, image_id))
     if cursor.fetchone():
         conn.close()
         raise ValueError(f"Filename '{new_filename}' already exists")
 
-    # Update the filename
+    # update the filename
     cursor.execute(f"UPDATE {table} SET filename = ? WHERE id = ?", (new_filename, image_id))
     conn.commit()
     conn.close()

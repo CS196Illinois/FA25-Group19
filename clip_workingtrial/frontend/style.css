@@ -1,10 +1,10 @@
-/* Color Palette:
-   #FEFEFE - Off White
-   #CCCCCC - Light Gray
-   #EDECEC - Warm Light Gray
-   #E0E7D7 - Soft Sage
-   #B7C396 - Muted Green
-   #BA9A91 - Dusty Rose
+/* color palette:
+   #fefefe - off white
+   #cccccc - light gray
+   #edecec - warm light gray
+   #e0e7d7 - soft sage
+   #b7c396 - muted green
+   #ba9a91 - dusty rose
 */
 
 * {
@@ -24,7 +24,7 @@ body {
     padding-top: 80px;
 }
 
-/* Navigation Bar */
+/* navigation bar */
 .navbar {
     position: fixed;
     top: 0;
@@ -66,7 +66,7 @@ body {
     transform: translateY(-2px);
 }
 
-/* Main Sections */
+/* main sections */
 .main-section {
     max-width: 1400px;
     margin: 3rem auto;
@@ -84,7 +84,7 @@ body {
     font-weight: 600;
 }
 
-/* Subsection Grid */
+/* subsection grid */
 .subsection-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
@@ -92,7 +92,7 @@ body {
     margin-top: 2rem;
 }
 
-/* Upload Subsections */
+/* upload subsections */
 .upload-subsection,
 .wardrobe-subsection,
 .style-upload-subsection,
@@ -128,7 +128,7 @@ body {
     font-style: italic;
 }
 
-/* File Input */
+/* file input */
 .file-input {
     display: block;
     width: 100%;
@@ -147,7 +147,7 @@ body {
     background: #EDECEC;
 }
 
-/* Preview Container */
+/* preview container */
 .preview-container {
     display: flex;
     flex-wrap: wrap;
@@ -203,7 +203,7 @@ body {
     transform: scale(1.1);
 }
 
-/* Buttons */
+/* buttons */
 button {
     background: linear-gradient(135deg, #B7C396 0%, #9eb07d 100%);
     color: #FEFEFE;
@@ -241,7 +241,7 @@ button:active {
     background: linear-gradient(135deg, #a8877f 0%, #BA9A91 100%);
 }
 
-/* Gallery Container */
+/* gallery container */
 .gallery-container {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -300,7 +300,7 @@ button:active {
     background: #EDECEC;
 }
 
-/* Generate Outfits Section */
+/* generate outfits section */
 .generate-buttons {
     display: flex;
     justify-content: center;
@@ -324,7 +324,7 @@ button:active {
     background: linear-gradient(135deg, #a8877f 0%, #BA9A91 100%);
 }
 
-/* Modal Styles */
+/* modal styles */
 .modal {
     display: none;
     position: fixed;
@@ -369,7 +369,7 @@ button:active {
     margin-bottom: 1.5rem;
 }
 
-/* Outfit Display */
+/* outfit display */
 .outfit-display {
     display: flex;
     gap: 2rem;
@@ -407,7 +407,7 @@ button:active {
     margin-top: 0.8rem;
 }
 
-/* Wardrobe Grid for Selection */
+/* wardrobe grid for selection */
 .wardrobe-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -451,7 +451,7 @@ button:active {
     word-wrap: break-word;
 }
 
-/* Additional Modal Elements */
+/* additional modal elements */
 #duplicateButtonContainer button {
     background: linear-gradient(135deg, #B7C396 0%, #9eb07d 100%);
     padding: 0.8rem 1.5rem;
@@ -489,7 +489,7 @@ button:active {
     border-color: #BA9A91;
 }
 
-/* Selection Mode Radio Buttons */
+/* selection mode radio buttons */
 input[type="radio"] {
     accent-color: #B7C396;
 }
@@ -508,14 +508,14 @@ select:focus {
     border-color: #BA9A91;
 }
 
-/* Confidence Warning */
+/* confidence warning */
 #confidenceWarning {
     background: linear-gradient(135deg, #E0E7D7 0%, #EDECEC 100%);
     border: 2px solid #B7C396;
     border-radius: 12px;
 }
 
-/* Responsive Design */
+/* responsive design */
 @media (max-width: 768px) {
     .nav-links {
         flex-direction: column;
@@ -545,12 +545,12 @@ select:focus {
     }
 }
 
-/* Smooth Scrolling Offset for Fixed Navbar */
+/* smooth scrolling offset for fixed navbar */
 section {
     scroll-margin-top: 100px;
 }
 
-/* Full Size Image Modal */
+/* full size image modal */
 .full-size-modal-content {
     background: linear-gradient(135deg, #FEFEFE 0%, #EDECEC 100%);
     margin: 2% auto;
